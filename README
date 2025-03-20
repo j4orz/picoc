@@ -1,7 +1,6 @@
 picoc: aot son-optimizing C89->{RV32I,LLVM} compiler
 usage: cargo run compilec89 ./path/to/file.c
 disclaimer: this is a one man effort to compile quake. beware of dragons.
-            built with love under the guidance of cliff click's coffee compiler club.
 references: cooper, siek, muchnick, møller, rastello, click
 versions:
 - 0.1.1: hackable. quakeable. -O1able.
