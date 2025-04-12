@@ -1,8 +1,7 @@
-picoc: aot son-optimizing C89->{RV32I,LLVM} compiler
+picoc: optimizing JIT compiler: C89->{RV32I,LLVM}
 usage: cargo run compilec89 ./path/to/file.c
-disclaimer: this is a one man effort to compile quake. beware of dragons.
-references: cooper, siek, muchnick, møller, rastello, click
+disclaimer: this is a one man effort to compile doom. beware of dragons.
 versions:
-- 0.1.1: hackable. quakeable. -O1able.
+- 0.1.1: hackable. doom. -O1able.
 - 0.1.2: jitable. ldable. -O2able.
 https://en.cppreference.com/w/c

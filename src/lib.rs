@@ -44,9 +44,9 @@ impl TryFrom<u32> for OptLevel {
     }
 }
 
-// *********************************************************************************************************************
-// ************************************************ SOURCE ENVIRONMENTS ************************************************
-// *********************************************************************************************************************
+// *****************************************************************************
+// **************************** SOURCE ENVIRONMENTS ****************************
+// *****************************************************************************
 
 // ***** static tnv: Map<Alias, Type> *****
 common_struct! { pub struct Tnv { fnv: HashMap<String, LambdaType>, vnv: HashMap<String, Type> }}
@@ -58,54 +58,9 @@ common_struct! { pub struct Vnv { fnv: HashMap<String, LambdaVal>, vnv: HashMap<
 common_struct! { pub struct LambdaVal { pub fp: Vec<String>, pub body: Vec<SStmt>} } // fp's only need types (tags) if implementing safety dynamically
 common_enum! { pub enum Val { Int(i32), Bool(bool), Str(String) } }
 
-// *********************************************************************************************************************
-// *********************************************** SOURCE REPRESENTATION ***********************************************
-// *********************************************************************************************************************
-
-// design 1: sum (polymorphic type) of products (data) with impl (behavior)
-// ------------------------------------------------------------------------
-// enum Node { FooNode({ inputs: Vec<Rc<Node>>, outputs: Vec<Rc<Node>> })}
-// impl Node { fn inputs(&self) -> &Vec<Rc<Self>> { match self { FooNode(foo_node) => &foo_node.inputs, } } }
-// -> smells: requires lots of matching to reveal the same data and perform same behavior.
-//            loc = shared behavior (600loc) * variants (45) = 27000loc (non-monomorphized)
-//            types and data are decoupled
-
-// design 2. sum of products with different coarse-graining
-// ------------------------------------------------------------------------
-// heterogeneity with Op product type (like typescript's kind pattern), data reuse with Node sum type
-
-// struct Node { op: Op, inputs: Vec<Rc<Node>>, outputs: Vec<Rc<Node>> }
-// enum Op { StartNode, ReturnNode { ctrl: Option<Rc<Node>>, expr: Option<Rc<Node>> }, ConstantNode { value: i32 } }
-// -> you can't match on Op because you need data on Node
-// impl Node { fn foo(&self) -> () {
-//   match self.op { Op::StartNode => todo!(), Op::ReturnNode { ctrl, expr } => todo!(), Op::ConstantNode { value } => todo!(), }
-// }}
-// -> smells: match on op to coarse-grain data.
-//            data-specific behavior implemented with either
-//            1. data duplication or (return node needs to store ctrl and expr, just to wrap inp[0] and inp[1])
-//            2. methods with sparse variant behavior on match (ctrl() and expr() method only applicable to return variant)
-
-// design 3: generics (polymorphic type) with trait bounds (behavior)
-// ------------------------------------------------------------------------
-// trait Node { fn inputs(&self) -> Vec<Rc<dyn Node>> { todo!() }}
-// struct StartNode<N: Node> { inputs: Vec<Rc<N>> }
-// impl<N: Node> Node for StartNode<N> { fn inputs(&self) -> Vec<Rc<dyn Node>> { todo!()  }}
-// fn foo<T: Node>(n: T) -> () { } -> smells: the level of resolution on n is too high. no way to match on n for data-specific behavior.
-//                                            generics with trait bounds is ok for homogenous data, not heterogeneous.
-
-// ==============================================
-// GRAPH: undirected, non-weighted.
-// ==============================================
-// design 4: trait objects: heterogeneous data
-// trait objects actually couple data and behavior,
-// but only the behavior is inherited in rust.
-// not as useful as trad oop
-
-// v.neighbors() --> w1, w2, ..., wn
-// - struct-oriented for now. only defining one subset E ⊆ (VxV).
-// - thus, undirected edges are partially defined on each side of the edge.
-//   -> v.inputs()  --> w1, w2, ..., wn are use-def pairs
-//   -> v.outputs() --> w1, w2, ..., wn are def-use pairs
+// *****************************************************************************
+// *************************** SOURCE REPRESENTATION ***************************
+// *****************************************************************************
 
 // FIXME: no static mut
 static mut ID: i128 = 0;
@@ -117,105 +72,15 @@ pub fn fresh_id() -> i128 {
     }
 }
 
-pub trait Node {
-    fn use_defs(&self) -> &[Rc<dyn Node>];
-    fn print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+enum Node {
+    Start(Vec<Self>),
+    Return(Vec<Self>),
+    Constant(Vec<Self>),
 }
 
-impl Debug for dyn Node {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.print(f)
-    }
-}
-
-pub struct StartNode {
-    _id: i128,
-    use_defs: Vec<Rc<dyn Node>>,
-    _def_uses: Vec<Rc<dyn Node>>,
-}
-
-impl Node for StartNode {
-    fn use_defs(&self) -> &[Rc<dyn Node>] {
-        &self.use_defs
-    }
-
-    fn print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "StartNode")
-    }
-}
-
-impl StartNode {
-    pub fn new() -> Self {
-        Self {
-            _id: fresh_id(),
-            use_defs: vec![],
-            _def_uses: vec![],
-        }
-    }
-}
-
-pub struct ReturnNode {
-    _id: i128,
-    use_def: Vec<Rc<dyn Node>>,
-    _def_use: Vec<Rc<dyn Node>>,
-}
-
-impl Node for ReturnNode {
-    fn use_defs(&self) -> &[Rc<dyn Node>] {
-        &self.use_def
-    }
-
-    fn print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.use_def.iter().for_each(|n| n.print(f).unwrap()); // FIXME; no unwrap
-        writeln!(f, "ReturnNode")
-    }
-}
-
-impl ReturnNode {
-    // todo: type ctrlnode and datanode?
-    pub fn new(ctrl: Rc<dyn Node>, expr: Rc<dyn Node>) -> Self {
-        Self {
-            _id: fresh_id(),
-            use_def: vec![ctrl, expr],
-            _def_use: vec![],
-        }
-    }
-
-    fn _ctrl(&self) -> &Rc<dyn Node> {
-        self.use_def.first().unwrap() // todo: change vec to array?
-    }
-
-    fn _expr(&self) -> &Rc<dyn Node> {
-        self.use_def.get(1).unwrap() // todo: change vec to array?
-    }
-}
-
-pub struct ConstantNode {
-    _id: i128,
-    value: i32,
-    use_def: Vec<Rc<dyn Node>>,
-    _def_use: Vec<Rc<dyn Node>>,
-}
-
-impl Node for ConstantNode {
-    fn use_defs(&self) -> &[Rc<dyn Node>] {
-        &self.use_def
-    }
-
-    fn print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "ConstantNode({})", self.value)
-    }
-}
-
-impl ConstantNode {
-    pub fn new(start: Rc<dyn Node>, value: i32) -> Self {
-        Self {
-            _id: fresh_id(),
-            value,
-            use_def: vec![start], // edge is not semantic. needed to enable graph walk.
-            _def_use: vec![],
-        }
-    }
+impl Node {
+    fn new() -> Self {}
+    fn print(&self) {}
 }
 
 // TODO: for loops, etc.
@@ -302,9 +167,9 @@ common_enum! { pub enum IRelOp { Eq, Neq, And, Or, LtEq, Lt, GtEq, Gt } }
 //
 //
 //
-// *********************************************************************************************************************
-// ****************************************** INTERMEDIATE/TARGET REFERENCES *******************************************
-// *********************************************************************************************************************
+// *****************************************************************************
+// ********************** INTERMEDIATE/TARGET REFERENCES ***********************
+// *****************************************************************************
 
 // picoc lowers the representation by flattening
 // intermediate ASTs -> target 3AC quads.
@@ -395,9 +260,9 @@ impl ToString for RiscvPointerReg {
 //
 //
 //
-// *********************************************************************************************************************
-// *********************************************** TARGET REPRESENTATION ***********************************************
-// *********************************************************************************************************************
+// *****************************************************************************
+// *************************** TARGET REPRESENTATION ***************************
+// *****************************************************************************
 
 // target 3AC quads
 common_enum! {
