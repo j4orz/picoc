@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 use std::rc::Rc;
 
 // pub mod evaluator;
@@ -59,7 +59,7 @@ common_struct! { pub struct LambdaVal { pub fp: Vec<String>, pub body: Vec<SStmt
 common_enum! { pub enum Val { Int(i32), Bool(bool), Str(String) } }
 
 // *****************************************************************************
-// *************************** SOURCE REPRESENTATION ***************************
+// *************************** CONTROL ***************************
 // *****************************************************************************
 
 // FIXME: no static mut
@@ -71,54 +71,109 @@ pub fn fresh_id() -> i128 {
     }
 }
 
-// NB: callers need to ensure correctness of variant-specific ud ordering.
-// abstracting away the underlying du/ud storage from callers is too messy in
-// rust given the lack of data inheritance (less trait objects).
-//     i.e for constructing a ReturnNode(ctrl, data) in Rust, there needs to be
-//     some wrap/unwrap decorator logic with types (inputs vs fields) so that
-//     callers don't have to concern themselves with the flat Vec<Instr> storage
-//     needed for graph walks.
-
+#[derive(Debug, Clone)]
 #[rustfmt::skip]
-enum InstrFields {
-    Start, Return(ReturnInstrField), // control
-    Constant, // data
+pub enum Instr {
+    Start(StartFields), Return(ReturnFields), // control
+    Constant(ConstantFields), // Add(AddFields), Sub(SubFields), Mul(MulFields), Div(DivFields), Neg(NegFields), // data
 }
 
-#[rustfmt::skip]
-struct StartInstrField {
-    id: i128, ud: Vec<Instr>, du: Vec<Instr>,
+// ********************************** CONTROL **********************************
+
+#[derive(Debug, Clone)]
+#[rustfmt::skip] pub struct StartFields {
+    id: i128,
 }
-
-#[rustfmt::skip]
-struct ReturnInstrField {
-    id: i128, ud: Vec<Instr>, du: Vec<Instr>,
-    ctl: Box<Instr>, data: Box<Instr>,
-}
-
-#[rustfmt::skip]
-struct ConstantInstrField {
-    id: i128, ud: Vec<Instr>, du: Vec<Instr>,
-    val: i32
-}
-
-// **************************************************
-
-#[rustfmt::skip]
-enum Instr {
-    Start(StartInstrField), Return(ReturnInstrField), // control
-    Constant(ConstantInstrField), // data
-}
-
-impl Instr {
-    fn new(typ: InstrFields) -> Self {
-        match typ {
-            InstrFields::Start => todo!(),
-            InstrFields::Return(fields) => Instr::Return(fields),
-            InstrFields::Constant => todo!(),
+impl StartFields {
+    fn new() -> Self {
+        Self {
+            id: fresh_id(),
         }
     }
 }
+
+#[rustfmt::skip]
+#[derive(Debug, Clone)]
+pub struct ReturnFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, ctrl: Rc<Instr>, data: Rc<Instr> }
+impl ReturnFields {
+    fn new(ctrl: Instr, data: Instr) -> Self {
+        let ud = vec![Rc::new(ctrl), Rc::new(data)];
+        let (ctrl, data) = (ud[0].clone(), ud[1].clone());
+
+        Self { id: fresh_id(), ud, du: vec![], ctrl, data }
+    }
+}
+
+// ************************************ DATA ***********************************
+
+#[rustfmt::skip] 
+#[derive(Clone, Debug)]
+pub struct ConstantFields { id: i128, ud: Vec<Instr>, du: Vec<Instr>, val: i32 }
+impl ConstantFields {
+    fn new(ctrl: Instr, val: i32) -> Self {
+        Self {
+            id: fresh_id(),
+            ud: vec![ctrl], // phantom edge to start enabling graph traversal
+            du: vec![],
+            val,
+        }
+    }
+}
+
+// #[rustfmt::skip]
+// #[derive(Clone)]
+// pub struct AddFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+// impl AddFields {
+//     fn new(x: Instr, y: Instr) -> Self {
+//         let ud = vec![Rc::new(x), Rc::new(y)];
+//         let (x, y) = (ud[0].clone(), ud[1].clone());
+//         Self { id: fresh_id(), ud, du: todo!(), x, y }
+//     }
+// }
+
+// #[rustfmt::skip]
+// #[derive(Clone)]
+// pub struct SubFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+// impl SubFields {
+//     fn new(x: Instr, y: Instr) -> Self {
+//         let ud = vec![Rc::new(x), Rc::new(y)];
+//         let (x, y) = (ud[0].clone(), ud[1].clone());
+//         Self { id: fresh_id(), ud, du: todo!(), x, y }
+//     }
+// }
+
+// #[rustfmt::skip]
+// #[derive(Clone)]
+// pub struct MulFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+// impl MulFields {
+//     fn new(x: Instr, y: Instr) -> Self {
+//         let ud = vec![Rc::new(x), Rc::new(y)];
+//         let (x, y) = (ud[0].clone(), ud[1].clone());
+//         Self { id: fresh_id(), ud, du: todo!(), x, y }
+//     }
+// }
+
+// #[rustfmt::skip]
+// #[derive(Clone)]
+// pub struct DivFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+// impl DivFields {
+//     fn new(x: Instr, y: Instr) -> Self {
+//         let ud = vec![Rc::new(x), Rc::new(y)];
+//         let (x, y) = (ud[0].clone(), ud[1].clone());
+//         Self { id: fresh_id(), ud, du: todo!(), x, y }
+//     }
+// }
+
+// #[rustfmt::skip]
+// #[derive(Clone)]
+// pub struct NegFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+// impl NegFields {
+//     fn new(x: Instr, y: Instr) -> Self {
+//         let ud = vec![Rc::new(x), Rc::new(y)];
+//         let (x, y) = (ud[0].clone(), ud[1].clone());
+//         Self { id: fresh_id(), ud, du: todo!(), x, y }
+//     }
+// }
 
 // TODO: for loops, etc.
 type _SugaredPrg = Vec<()>;

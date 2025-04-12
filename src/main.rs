@@ -12,7 +12,7 @@ fn main() {
     ⠀⠀⣼⣆⠀⠀⠀⠀⣰⣧⠀⠀
     ⠀⣼⣿⣿⣆⠀⠀⣰⣿⣿⣧⠀
     ⠾⠟⠿⠿⠿⠧⠼⠿⠿⠿⠻⠷
-    picoc: aot son-optimizing C89->{{RV32I, LLVM}} compiler
+    picoc: optimizing JIT compiler: C89->{{RV32I, LLVM}}
     "
     );
 
