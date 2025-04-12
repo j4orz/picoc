@@ -64,7 +64,6 @@ common_enum! { pub enum Val { Int(i32), Bool(bool), Str(String) } }
 
 // FIXME: no static mut
 static mut ID: i128 = 0;
-
 pub fn fresh_id() -> i128 {
     unsafe {
         ID += 1;
@@ -72,15 +71,53 @@ pub fn fresh_id() -> i128 {
     }
 }
 
-enum Node {
-    Start(Vec<Self>),
-    Return(Vec<Self>),
-    Constant(Vec<Self>),
+// NB: callers need to ensure correctness of variant-specific ud ordering.
+// abstracting away the underlying du/ud storage from callers is too messy in
+// rust given the lack of data inheritance (less trait objects).
+//     i.e for constructing a ReturnNode(ctrl, data) in Rust, there needs to be
+//     some wrap/unwrap decorator logic with types (inputs vs fields) so that
+//     callers don't have to concern themselves with the flat Vec<Instr> storage
+//     needed for graph walks.
+
+#[rustfmt::skip]
+enum InstrFields {
+    Start, Return(ReturnInstrField), // control
+    Constant, // data
 }
 
-impl Node {
-    fn new() -> Self {}
-    fn print(&self) {}
+#[rustfmt::skip]
+struct StartInstrField {
+    id: i128, ud: Vec<Instr>, du: Vec<Instr>,
+}
+
+#[rustfmt::skip]
+struct ReturnInstrField {
+    id: i128, ud: Vec<Instr>, du: Vec<Instr>,
+    ctl: Box<Instr>, data: Box<Instr>,
+}
+
+#[rustfmt::skip]
+struct ConstantInstrField {
+    id: i128, ud: Vec<Instr>, du: Vec<Instr>,
+    val: i32
+}
+
+// **************************************************
+
+#[rustfmt::skip]
+enum Instr {
+    Start(StartInstrField), Return(ReturnInstrField), // control
+    Constant(ConstantInstrField), // data
+}
+
+impl Instr {
+    fn new(typ: InstrFields) -> Self {
+        match typ {
+            InstrFields::Start => todo!(),
+            InstrFields::Return(fields) => Instr::Return(fields),
+            InstrFields::Constant => todo!(),
+        }
+    }
 }
 
 // TODO: for loops, etc.
