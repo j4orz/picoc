@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Token, TT},
-    ConstantFields, Instr, ReturnFields, StartFields,
+    ConstantFields, Instr, ReturnFields, StartFields, Type,
 };
 use std::io;
 
@@ -46,13 +46,45 @@ fn parse_stmt(start: Instr, tokens: &[Token]) -> Result<(Instr, &[Token]), io::E
 
 fn parse_expr(start: Instr, tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
     match tokens {
+        [] => panic!(),
+        [f, r @ ..] => todo!(),
+    }
+}
+
+fn parse_term(start: Instr, tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+    match tokens {
+        [] => panic!(),
+        [f, r @ ..] => match f.typ {
+            TT::Plus => todo!(),
+            TT::Minus => todo!(),
+            _ => panic!(),
+        },
+    }
+}
+
+fn parse_factor(start: Instr, tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+    match tokens {
+        [] => panic!(),
+        [f, r @ ..] => match f.typ {
+            TT::Star => todo!(),
+            TT::Slash => todo!(),
+            _ => panic!(),
+        },
+    }
+}
+
+fn parse_atom(start: Instr, tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+    match tokens {
         [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
         [f, r @ ..] => match f.typ {
             TT::LiteralInt => {
-                let constantinstr =
-                    Instr::Constant(ConstantFields::new(start, f.lexeme.parse().unwrap()));
+                let constantinstr = Instr::Constant(ConstantFields::new(
+                    start,
+                    Type::Int(f.lexeme.parse().unwrap()),
+                ));
                 Ok((constantinstr, r))
             }
+            // TT:Alias ...
             t => Err(io::Error::new(
                 io::ErrorKind::Other,
                 format!("expected: {:?} got: {:?}", TT::LiteralInt, t),

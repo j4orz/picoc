@@ -49,9 +49,9 @@ impl TryFrom<u32> for OptLevel {
 // *****************************************************************************
 
 // ***** static tnv: Map<Alias, Type> *****
-common_struct! { pub struct Tnv { fnv: HashMap<String, LambdaType>, vnv: HashMap<String, Type> }}
-common_struct! { pub struct LambdaType { fp: Vec<Type>, body: Type } }
-common_enum! { pub enum Type { Int, Bool, Void } } // Cond(Type::Bool, Box<Type>, Box<Type>),
+common_struct! { pub struct Tnv { fnv: HashMap<String, LambdaType>, vnv: HashMap<String, OldType> }}
+common_struct! { pub struct LambdaType { fp: Vec<OldType>, body: OldType } }
+common_enum! { pub enum OldType { Int, Bool, Void } } // Cond(Type::Bool, Box<Type>, Box<Type>),
 
 // ***** dynamic vnv: Map<Alias, Val> *****
 common_struct! { pub struct Vnv { fnv: HashMap<String, LambdaVal>, vnv: HashMap<String, i32> }} // todo, -> Val
@@ -71,36 +71,69 @@ pub fn fresh_id() -> i128 {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+#[rustfmt::skip]
+pub enum Type { Bot, Top, Simple, Int(i128) }
+impl Type {}
+
 #[derive(Debug, Clone)]
 #[rustfmt::skip]
 pub enum Instr {
     Start(StartFields), Return(ReturnFields), // control
-    Constant(ConstantFields), // Add(AddFields), Sub(SubFields), Mul(MulFields), Div(DivFields), Neg(NegFields), // data
+    Constant(ConstantFields), Add(AddFields), Sub(SubFields), Mul(MulFields), Div(DivFields), Neg(NegFields), // data
+}
+
+impl Instr {
+    pub fn peephole(&self) -> Self {
+        let typ = self.eval_type();
+        // optimizations
+        // - dead code elimination (DCE)
+        // - common subexpression elimination (CSE)
+        // - constant folding, constant propagation
+        // - global value numbering
+        todo!()
+    }
+    fn eval_type(&self) -> Type { // typer.rs
+        match self {
+            Instr::Start(start_fields) => todo!(),
+            Instr::Return(return_fields) => todo!(),
+            Instr::Constant(constant_fields) => constant_fields.typ,
+            Instr::Add(AddFields { x, y, .. }) => {
+                match (x.eval_type(), y.eval_type()) {
+                    (Type::Int(x), Type::Int(y)) => Type::Int(x + y),
+                    _ => Type::Bot,
+                }
+            }
+            Instr::Sub(sub_fields) => todo!(),
+            Instr::Mul(mul_fields) => todo!(),
+            Instr::Div(div_fields) => todo!(),
+            Instr::Neg(neg_fields) => todo!(),
+        }
+    }
+    fn idealize(&self) {}
 }
 
 // ********************************** CONTROL **********************************
 
 #[derive(Debug, Clone)]
 #[rustfmt::skip] pub struct StartFields {
-    id: i128,
+    id: i128, typ: Type,
 }
 impl StartFields {
     fn new() -> Self {
-        Self {
-            id: fresh_id(),
-        }
+        Self { id: fresh_id(), typ: todo!() }
     }
 }
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct ReturnFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, ctrl: Rc<Instr>, data: Rc<Instr> }
+pub struct ReturnFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, ctrl: Rc<Instr>, data: Rc<Instr> }
 impl ReturnFields {
     fn new(ctrl: Instr, data: Instr) -> Self {
         let ud = vec![Rc::new(ctrl), Rc::new(data)];
         let (ctrl, data) = (ud[0].clone(), ud[1].clone());
 
-        Self { id: fresh_id(), ud, du: vec![], ctrl, data }
+        Self { id: fresh_id(), typ: todo!(), ud, du: vec![], ctrl, data }
     }
 }
 
@@ -108,72 +141,72 @@ impl ReturnFields {
 
 #[rustfmt::skip] 
 #[derive(Clone, Debug)]
-pub struct ConstantFields { id: i128, ud: Vec<Instr>, du: Vec<Instr>, val: i32 }
+pub struct ConstantFields { id: i128, typ: Type, ud: Vec<Instr>, du: Vec<Instr> }
 impl ConstantFields {
-    fn new(ctrl: Instr, val: i32) -> Self {
+    fn new(ctrl: Instr, typ: Type) -> Self {
         Self {
             id: fresh_id(),
+            typ,
             ud: vec![ctrl], // phantom edge to start enabling graph traversal
             du: vec![],
-            val,
         }
     }
 }
 
-// #[rustfmt::skip]
-// #[derive(Clone)]
-// pub struct AddFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
-// impl AddFields {
-//     fn new(x: Instr, y: Instr) -> Self {
-//         let ud = vec![Rc::new(x), Rc::new(y)];
-//         let (x, y) = (ud[0].clone(), ud[1].clone());
-//         Self { id: fresh_id(), ud, du: todo!(), x, y }
-//     }
-// }
+#[rustfmt::skip]
+#[derive(Debug, Clone)]
+pub struct AddFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+impl AddFields {
+    fn new(x: Instr, y: Instr) -> Self {
+        let ud = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (ud[0].clone(), ud[1].clone());
+        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+    }
+}
 
-// #[rustfmt::skip]
-// #[derive(Clone)]
-// pub struct SubFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
-// impl SubFields {
-//     fn new(x: Instr, y: Instr) -> Self {
-//         let ud = vec![Rc::new(x), Rc::new(y)];
-//         let (x, y) = (ud[0].clone(), ud[1].clone());
-//         Self { id: fresh_id(), ud, du: todo!(), x, y }
-//     }
-// }
+#[rustfmt::skip]
+#[derive(Debug, Clone)]
+pub struct SubFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+impl SubFields {
+    fn new(x: Instr, y: Instr) -> Self {
+        let ud = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (ud[0].clone(), ud[1].clone());
+        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+    }
+}
 
-// #[rustfmt::skip]
-// #[derive(Clone)]
-// pub struct MulFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
-// impl MulFields {
-//     fn new(x: Instr, y: Instr) -> Self {
-//         let ud = vec![Rc::new(x), Rc::new(y)];
-//         let (x, y) = (ud[0].clone(), ud[1].clone());
-//         Self { id: fresh_id(), ud, du: todo!(), x, y }
-//     }
-// }
+#[rustfmt::skip]
+#[derive(Debug, Clone)]
+pub struct MulFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+impl MulFields {
+    fn new(x: Instr, y: Instr) -> Self {
+        let ud = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (ud[0].clone(), ud[1].clone());
+        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+    }
+}
 
-// #[rustfmt::skip]
-// #[derive(Clone)]
-// pub struct DivFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
-// impl DivFields {
-//     fn new(x: Instr, y: Instr) -> Self {
-//         let ud = vec![Rc::new(x), Rc::new(y)];
-//         let (x, y) = (ud[0].clone(), ud[1].clone());
-//         Self { id: fresh_id(), ud, du: todo!(), x, y }
-//     }
-// }
+#[rustfmt::skip]
+#[derive(Debug, Clone)]
+pub struct DivFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+impl DivFields {
+    fn new(x: Instr, y: Instr) -> Self {
+        let ud = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (ud[0].clone(), ud[1].clone());
+        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+    }
+}
 
-// #[rustfmt::skip]
-// #[derive(Clone)]
-// pub struct NegFields { id: i128, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
-// impl NegFields {
-//     fn new(x: Instr, y: Instr) -> Self {
-//         let ud = vec![Rc::new(x), Rc::new(y)];
-//         let (x, y) = (ud[0].clone(), ud[1].clone());
-//         Self { id: fresh_id(), ud, du: todo!(), x, y }
-//     }
-// }
+#[rustfmt::skip]
+#[derive(Debug, Clone)]
+pub struct NegFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+impl NegFields {
+    fn new(x: Instr, y: Instr) -> Self {
+        let ud = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (ud[0].clone(), ud[1].clone());
+        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+    }
+}
 
 // TODO: for loops, etc.
 type _SugaredPrg = Vec<()>;
@@ -186,8 +219,8 @@ type _SugaredPrg = Vec<()>;
 
 type SPrg = Vec<SDef>;
 common_enum! { pub enum SDef { FuncDef(SFuncDef), VarDef(SVarDef) } }
-common_struct! { pub struct SFuncDef {pub alias: String,  pub typ: Type, pub fps: Vec<(String, Type)>, pub body: Vec<SStmt> } } // fp needs Type for statics, and String for dynamics
-common_struct! { pub struct SVarDef { pub alias: String, pub typ: Type, pub expr: Box<SExpr> }} // UpdateBind { alias: String, op: BinOp, expr: Box<Expr> }
+common_struct! { pub struct SFuncDef {pub alias: String,  pub typ: OldType, pub fps: Vec<(String, OldType)>, pub body: Vec<SStmt> } } // fp needs Type for statics, and String for dynamics
+common_struct! { pub struct SVarDef { pub alias: String, pub typ: OldType, pub expr: Box<SExpr> }} // UpdateBind { alias: String, op: BinOp, expr: Box<Expr> }
 
 common_enum! {
     pub enum SStmt {
