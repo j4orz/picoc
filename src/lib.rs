@@ -72,20 +72,43 @@ pub fn fresh_id() -> i128 {
         ID += 1;
         ID
     }
+
 }
 
+
+// ******************** STATICS (TYPES) + DYNAMICS (VALUES) ********************
+
+// these types construct a lattice, which is a partially ordered set with unique
+// least upper bounds and greatest lower bounds
+// see: https://en.wikipedia.org/wiki/Lattice_(order)
 #[derive(Debug, Copy, Clone, PartialEq)]
 #[rustfmt::skip]
 pub enum Type { Bot, Top, Simple, Int(i128) }
-impl Type {}
+impl Type {
+    fn is_constant(&self) -> bool {
+        match self {
+            Type::Bot => false,
+            Type::Top => true,
+            Type::Simple => todo!(),
+            Type::Int(_) => true,
+        }
+    }
+}
 
+// NB: the type for all instruction variant constructors (Self::new()) default
+// to Type::Bot since peephole optimizations are pessimistically monotonic
+// over the lattice.
 #[derive(Debug, Clone,)]
 #[rustfmt::skip]
 pub enum Instr {
     Start(StartFields), Return(ReturnFields), // control
     Constant(ConstantFields), Add(AddFields), Sub(SubFields), Mul(MulFields), Div(DivFields), Neg(NegFields), // data
 }
+
 // ********************************** CONTROL **********************************
+// NB: control instructions still have a type because the sea of nodes
+// representation is homogenous (instruction agnostic). control instructions
+// can be peephole optimized with TODO: (phi functions.)
 
 #[derive(Debug, Clone)]
 #[rustfmt::skip] pub struct StartFields {

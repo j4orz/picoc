@@ -61,7 +61,7 @@ fn parse_term(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
             }
             t => {
                 println!("moose {:?}", r);
-                Ok((x, _r))
+                Ok((x, r))
             }
         },
     }
@@ -145,46 +145,55 @@ mod test_arith {
         insta::assert_debug_snapshot!(graph, @r###"
         Return(
             ReturnFields {
-                id: 3,
+                id: 2,
+                typ: Bot,
                 ud: [
                     Start(
                         StartFields {
-                            id: 1,
+                            id: 0,
+                            typ: Bot,
                         },
                     ),
                     Constant(
                         ConstantFields {
-                            id: 2,
+                            id: 1,
+                            typ: Int(
+                                8,
+                            ),
                             ud: [
                                 Start(
                                     StartFields {
-                                        id: 1,
+                                        id: 0,
+                                        typ: Bot,
                                     },
                                 ),
                             ],
                             du: [],
-                            val: 8,
                         },
                     ),
                 ],
                 du: [],
                 ctrl: Start(
                     StartFields {
-                        id: 1,
+                        id: 0,
+                        typ: Bot,
                     },
                 ),
                 data: Constant(
                     ConstantFields {
-                        id: 2,
+                        id: 1,
+                        typ: Int(
+                            8,
+                        ),
                         ud: [
                             Start(
                                 StartFields {
-                                    id: 1,
+                                    id: 0,
+                                    typ: Bot,
                                 },
                             ),
                         ],
                         du: [],
-                        val: 8,
                     },
                 ),
             },
@@ -210,170 +219,50 @@ mod test_arith {
                 ud: [
                     Start(
                         StartFields {
-                            id: 1,
+                            id: 0,
                             typ: Bot,
                         },
                     ),
-                    Add(
-                        AddFields {
+                    Constant(
+                        ConstantFields {
                             id: 4,
-                            typ: Bot,
+                            typ: Int(
+                                19,
+                            ),
                             ud: [
-                                Constant(
-                                    ConstantFields {
-                                        id: 2,
-                                        typ: Int(
-                                            9,
-                                        ),
-                                        ud: [
-                                            Start(
-                                                StartFields {
-                                                    id: 1,
-                                                    typ: Bot,
-                                                },
-                                            ),
-                                        ],
-                                        du: [],
-                                    },
-                                ),
-                                Constant(
-                                    ConstantFields {
-                                        id: 3,
-                                        typ: Int(
-                                            10,
-                                        ),
-                                        ud: [
-                                            Start(
-                                                StartFields {
-                                                    id: 1,
-                                                    typ: Bot,
-                                                },
-                                            ),
-                                        ],
-                                        du: [],
+                                Start(
+                                    StartFields {
+                                        id: 0,
+                                        typ: Bot,
                                     },
                                 ),
                             ],
                             du: [],
-                            x: Constant(
-                                ConstantFields {
-                                    id: 2,
-                                    typ: Int(
-                                        9,
-                                    ),
-                                    ud: [
-                                        Start(
-                                            StartFields {
-                                                id: 1,
-                                                typ: Bot,
-                                            },
-                                        ),
-                                    ],
-                                    du: [],
-                                },
-                            ),
-                            y: Constant(
-                                ConstantFields {
-                                    id: 3,
-                                    typ: Int(
-                                        10,
-                                    ),
-                                    ud: [
-                                        Start(
-                                            StartFields {
-                                                id: 1,
-                                                typ: Bot,
-                                            },
-                                        ),
-                                    ],
-                                    du: [],
-                                },
-                            ),
                         },
                     ),
                 ],
                 du: [],
                 ctrl: Start(
                     StartFields {
-                        id: 1,
+                        id: 0,
                         typ: Bot,
                     },
                 ),
-                data: Add(
-                    AddFields {
+                data: Constant(
+                    ConstantFields {
                         id: 4,
-                        typ: Bot,
+                        typ: Int(
+                            19,
+                        ),
                         ud: [
-                            Constant(
-                                ConstantFields {
-                                    id: 2,
-                                    typ: Int(
-                                        9,
-                                    ),
-                                    ud: [
-                                        Start(
-                                            StartFields {
-                                                id: 1,
-                                                typ: Bot,
-                                            },
-                                        ),
-                                    ],
-                                    du: [],
-                                },
-                            ),
-                            Constant(
-                                ConstantFields {
-                                    id: 3,
-                                    typ: Int(
-                                        10,
-                                    ),
-                                    ud: [
-                                        Start(
-                                            StartFields {
-                                                id: 1,
-                                                typ: Bot,
-                                            },
-                                        ),
-                                    ],
-                                    du: [],
+                            Start(
+                                StartFields {
+                                    id: 0,
+                                    typ: Bot,
                                 },
                             ),
                         ],
                         du: [],
-                        x: Constant(
-                            ConstantFields {
-                                id: 2,
-                                typ: Int(
-                                    9,
-                                ),
-                                ud: [
-                                    Start(
-                                        StartFields {
-                                            id: 1,
-                                            typ: Bot,
-                                        },
-                                    ),
-                                ],
-                                du: [],
-                            },
-                        ),
-                        y: Constant(
-                            ConstantFields {
-                                id: 3,
-                                typ: Int(
-                                    10,
-                                ),
-                                ud: [
-                                    Start(
-                                        StartFields {
-                                            id: 1,
-                                            typ: Bot,
-                                        },
-                                    ),
-                                ],
-                                du: [],
-                            },
-                        ),
                     },
                 ),
             },

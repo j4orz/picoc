@@ -1,23 +1,13 @@
 use std::sync::Arc;
-
 use crate::{parser::START, AddFields, ConstantFields, Instr, Type};
 
 impl Instr {
-    // many optimizations become peepholes
-    // with sea of nodes representation:
-    // 1. dead code elimination (DCE)
-    // 2. common subexpression elimination (CSE)
-    pub fn peephole(self) -> Self {
+    pub fn peephole(self) -> Self { // many optimizations become peepholes with sea of nodes representation:
         let typ = self.eval_type();
-
-        // -constant folding, constant propagation
-        let instr = match self {
+        let instr = match self { // -constant propagation/folding (modest dead code elimination)
             Instr::Constant(_) => self,
-            _ => if typ == Type::Top { Instr::Constant(ConstantFields::new(Arc::new(START.clone()), typ)) } else { self },
+            _ => if typ.is_constant() { Instr::Constant(ConstantFields::new(Arc::new(START.clone()), typ)) } else { self },
         };
-
-        // -global value numbering
-
         return instr;
     }
 
@@ -28,6 +18,9 @@ impl Instr {
             Instr::Return(return_fields) => todo!(),
             Instr::Constant(constant_fields) => constant_fields.typ,
             Instr::Add(AddFields { x, y, .. }) => match (x.eval_type(), y.eval_type()) {
+                // ⊢ e1 : Int, ⊢ e2 : Int
+                // ------------------------ BIN_OP
+                //     ⊢ e1 + e2 : Int
                 (Type::Int(x), Type::Int(y)) => Type::Int(x + y),
                 _ => Type::Bot,
             },
