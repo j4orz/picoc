@@ -1,12 +1,12 @@
 use crate::{
-    lexer::{Token, TT},
-    AddFields, ConstantFields, DivFields, Instr, MulFields, ReturnFields, StartFields, SubFields,
-    Type,
+    lexer::{Token, TT}, AddFields, ConstantFields, DivFields, Instr, MulFields, ReturnFields, StartFields, SubFields, Type
 };
-use std::{io, rc::Rc};
+use std::{io, sync::Arc};
+
+pub static START: Instr =  Instr::Start(StartFields { id: 0, typ: Type::Bot });
+
 
 pub fn parse_prg(tokens: &[Token]) -> Result<Instr, io::Error> {
-    let startinstr = Rc::new(Instr::Start(StartFields::new()));
     let r = tokens;
     let (_, r) = mtch(r, TT::KeywordInt)?;
     let (_, r) = mtch(r, TT::Alias)?;
@@ -14,7 +14,7 @@ pub fn parse_prg(tokens: &[Token]) -> Result<Instr, io::Error> {
     let (_, r) = mtch(r, TT::PuncRightParen)?;
 
     let (_, r) = mtch(r, TT::PuncLeftBrace)?;
-    let (stmt, r) = parse_stmt(startinstr, r)?;
+    let (stmt, r) = parse_stmt(r)?;
     let (_, r) = mtch(r, TT::PuncRightBrace)?;
 
     if r.is_empty() {
@@ -27,14 +27,14 @@ pub fn parse_prg(tokens: &[Token]) -> Result<Instr, io::Error> {
     }
 }
 
-fn parse_stmt(start: Rc<Instr>, tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+fn parse_stmt(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
     match tokens {
         [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
         [f, r @ ..] => match f.typ {
             TT::KeywordRet => {
-                let (expr, r) = parse_term(start.clone(), r)?;
+                let (expr, r) = parse_term( r)?;
                 let (_, r) = mtch(r, TT::PuncSemiColon)?;
-                let retinstr = Instr::Return(ReturnFields::new(start, expr));
+                let retinstr = Instr::Return(ReturnFields::new(Arc::new(START.clone()), expr));
                 Ok((retinstr, r))
             }
             t => Err(io::Error::new(
@@ -45,18 +45,18 @@ fn parse_stmt(start: Rc<Instr>, tokens: &[Token]) -> Result<(Instr, &[Token]), i
     }
 }
 
-fn parse_term(start: Rc<Instr>, tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
-    let (x, r) = parse_factor(start.clone(), tokens)?;
+fn parse_term(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+    let (x, r) = parse_factor( tokens)?;
 
     match r {
         [] => panic!(),
         [f, _r @ ..] => match f.typ {
             TT::Plus => {
-                let (y, r) = parse_factor(start, _r)?;
-                Ok((Instr::Add(AddFields::new(x, y)), r))
+                let (y, r) = parse_factor(_r)?;
+                Ok((Instr::Add(AddFields::new(x, y)).peephole(), r))
             }
             TT::Minus => {
-                let (y, r) = parse_factor(start, _r)?;
+                let (y, r) = parse_factor( _r)?;
                 Ok((Instr::Sub(SubFields::new(x, y)), r))
             }
             t => {
@@ -67,18 +67,18 @@ fn parse_term(start: Rc<Instr>, tokens: &[Token]) -> Result<(Instr, &[Token]), i
     }
 }
 
-fn parse_factor(start: Rc<Instr>, tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
-    let (x, r) = parse_atom(start.clone(), tokens)?;
+fn parse_factor(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+    let (x, r) = parse_atom( tokens)?;
 
     match r {
         [] => panic!(),
         [f, _r @ ..] => match f.typ {
             TT::Star => {
-                let (y, r) = parse_atom(start, _r)?;
+                let (y, r) = parse_atom( _r)?;
                 Ok((Instr::Mul(MulFields::new(x, y)), r))
             }
             TT::Slash => {
-                let (y, r) = parse_atom(start, _r)?;
+                let (y, r) = parse_atom( _r)?;
                 Ok((Instr::Div(DivFields::new(x, y)), r))
             }
             _ => Ok((x, r)),
@@ -86,13 +86,13 @@ fn parse_factor(start: Rc<Instr>, tokens: &[Token]) -> Result<(Instr, &[Token]),
     }
 }
 
-fn parse_atom(start: Rc<Instr>, tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+fn parse_atom(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
     match tokens {
         [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
         [f, r @ ..] => match f.typ {
             TT::LiteralInt => {
                 let constantinstr = Instr::Constant(ConstantFields::new(
-                    start,
+                    Arc::new(START.clone()),
                     Type::Int(f.lexeme.parse().unwrap()),
                 ));
                 Ok((constantinstr, r))

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::rc::Rc;
+use std::sync::Arc;
 
 // pub mod evaluator;
 // pub mod allocator;
@@ -74,7 +74,7 @@ pub fn fresh_id() -> i128 {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[rustfmt::skip]
 pub enum Type { Bot, Top, Simple, Int(i128) }
 impl Type {}
@@ -99,10 +99,10 @@ impl StartFields {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct ReturnFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, ctrl: Rc<Instr>, data: Rc<Instr> }
+pub struct ReturnFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, ctrl: Arc<Instr>, data: Arc<Instr> }
 impl ReturnFields {
-    fn new(ctrl: Rc<Instr>, data: Instr) -> Self {
-        let ud = vec![ctrl, Rc::new(data)];
+    fn new(ctrl: Arc<Instr>, data: Instr) -> Self {
+        let ud = vec![ctrl, Arc::new(data)];
         let (ctrl, data) = (ud[0].clone(), ud[1].clone());
 
         Self { id: fresh_id(), typ: Type::Bot, ud, du: vec![], ctrl, data }
@@ -113,9 +113,9 @@ impl ReturnFields {
 
 #[rustfmt::skip] 
 #[derive(Clone, Debug)]
-pub struct ConstantFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Instr> }
+pub struct ConstantFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Instr> }
 impl ConstantFields {
-    fn new(ctrl: Rc<Instr>, typ: Type) -> Self {
+    fn new(ctrl: Arc<Instr>, typ: Type) -> Self {
         Self {
             id: fresh_id(),
             typ,
@@ -127,10 +127,10 @@ impl ConstantFields {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct AddFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+pub struct AddFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
 impl AddFields {
     fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Rc::new(x), Rc::new(y)];
+        let ud = vec![Arc::new(x), Arc::new(y)];
         let (x, y) = (ud[0].clone(), ud[1].clone());
         Self { id: fresh_id(), typ: Type::Bot, ud, du: vec![], x, y }
     }
@@ -138,10 +138,10 @@ impl AddFields {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct SubFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+pub struct SubFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
 impl SubFields {
     fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Rc::new(x), Rc::new(y)];
+        let ud = vec![Arc::new(x), Arc::new(y)];
         let (x, y) = (ud[0].clone(), ud[1].clone());
         Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
     }
@@ -149,10 +149,10 @@ impl SubFields {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct MulFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+pub struct MulFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
 impl MulFields {
     fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Rc::new(x), Rc::new(y)];
+        let ud = vec![Arc::new(x), Arc::new(y)];
         let (x, y) = (ud[0].clone(), ud[1].clone());
         Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
     }
@@ -160,10 +160,10 @@ impl MulFields {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct DivFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+pub struct DivFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
 impl DivFields {
     fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Rc::new(x), Rc::new(y)];
+        let ud = vec![Arc::new(x), Arc::new(y)];
         let (x, y) = (ud[0].clone(), ud[1].clone());
         Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
     }
@@ -171,10 +171,10 @@ impl DivFields {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct NegFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, x: Rc<Instr>, y: Rc<Instr> }
+pub struct NegFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
 impl NegFields {
     fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Rc::new(x), Rc::new(y)];
+        let ud = vec![Arc::new(x), Arc::new(y)];
         let (x, y) = (ud[0].clone(), ud[1].clone());
         Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
     }
