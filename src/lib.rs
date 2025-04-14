@@ -4,14 +4,17 @@ use std::fmt::Debug;
 use std::rc::Rc;
 
 // pub mod evaluator;
-pub mod allocator;
+// pub mod allocator;
+// pub mod selector;
+// pub mod translator;
 pub mod lexer;
+pub mod optimizer;
 pub mod parser;
-pub mod parser_ast;
-pub mod selector;
-pub mod translator;
-pub mod typer;
-pub mod visualizer;
+// pub mod parser_ast;
+
+
+// pub mod typer;
+// pub mod visualizer;
 
 macro_rules! common_struct {
 
@@ -76,43 +79,12 @@ pub fn fresh_id() -> i128 {
 pub enum Type { Bot, Top, Simple, Int(i128) }
 impl Type {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,)]
 #[rustfmt::skip]
 pub enum Instr {
     Start(StartFields), Return(ReturnFields), // control
     Constant(ConstantFields), Add(AddFields), Sub(SubFields), Mul(MulFields), Div(DivFields), Neg(NegFields), // data
 }
-
-impl Instr {
-    pub fn peephole(&self) -> Self {
-        let typ = self.eval_type();
-        // optimizations
-        // - dead code elimination (DCE)
-        // - common subexpression elimination (CSE)
-        // - constant folding, constant propagation
-        // - global value numbering
-        todo!()
-    }
-    fn eval_type(&self) -> Type { // typer.rs
-        match self {
-            Instr::Start(start_fields) => todo!(),
-            Instr::Return(return_fields) => todo!(),
-            Instr::Constant(constant_fields) => constant_fields.typ,
-            Instr::Add(AddFields { x, y, .. }) => {
-                match (x.eval_type(), y.eval_type()) {
-                    (Type::Int(x), Type::Int(y)) => Type::Int(x + y),
-                    _ => Type::Bot,
-                }
-            }
-            Instr::Sub(sub_fields) => todo!(),
-            Instr::Mul(mul_fields) => todo!(),
-            Instr::Div(div_fields) => todo!(),
-            Instr::Neg(neg_fields) => todo!(),
-        }
-    }
-    fn idealize(&self) {}
-}
-
 // ********************************** CONTROL **********************************
 
 #[derive(Debug, Clone)]
@@ -121,7 +93,7 @@ impl Instr {
 }
 impl StartFields {
     fn new() -> Self {
-        Self { id: fresh_id(), typ: todo!() }
+        Self { id: fresh_id(), typ: Type::Bot }
     }
 }
 
@@ -129,11 +101,11 @@ impl StartFields {
 #[derive(Debug, Clone)]
 pub struct ReturnFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Rc<Instr>>, ctrl: Rc<Instr>, data: Rc<Instr> }
 impl ReturnFields {
-    fn new(ctrl: Instr, data: Instr) -> Self {
-        let ud = vec![Rc::new(ctrl), Rc::new(data)];
+    fn new(ctrl: Rc<Instr>, data: Instr) -> Self {
+        let ud = vec![ctrl, Rc::new(data)];
         let (ctrl, data) = (ud[0].clone(), ud[1].clone());
 
-        Self { id: fresh_id(), typ: todo!(), ud, du: vec![], ctrl, data }
+        Self { id: fresh_id(), typ: Type::Bot, ud, du: vec![], ctrl, data }
     }
 }
 
@@ -141,9 +113,9 @@ impl ReturnFields {
 
 #[rustfmt::skip] 
 #[derive(Clone, Debug)]
-pub struct ConstantFields { id: i128, typ: Type, ud: Vec<Instr>, du: Vec<Instr> }
+pub struct ConstantFields { id: i128, typ: Type, ud: Vec<Rc<Instr>>, du: Vec<Instr> }
 impl ConstantFields {
-    fn new(ctrl: Instr, typ: Type) -> Self {
+    fn new(ctrl: Rc<Instr>, typ: Type) -> Self {
         Self {
             id: fresh_id(),
             typ,
@@ -160,7 +132,7 @@ impl AddFields {
     fn new(x: Instr, y: Instr) -> Self {
         let ud = vec![Rc::new(x), Rc::new(y)];
         let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+        Self { id: fresh_id(), typ: Type::Bot, ud, du: vec![], x, y }
     }
 }
 

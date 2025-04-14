@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Token, TT},
-    SBinOp, SDef, SExpr, SFuncDef, SPrg, SRelOp, SStmt, SVarDef, Type,
+    OldType, SBinOp, SDef, SExpr, SFuncDef, SPrg, SRelOp, SStmt, SVarDef,
 };
 use std::io;
 use std::num::ParseIntError;
@@ -42,7 +42,7 @@ fn parse_funcdef(tokens: &[Token]) -> Result<(SFuncDef, &[Token]), io::Error> {
     let (mut fps, mut r) = (vec![], r);
     while let Ok((_fp_type, _r)) = eat(r, TT::KeywordInt) {
         let (alias, _r) = eat(_r, TT::Alias)?;
-        fps.push((alias.lexeme.to_owned(), Type::Int));
+        fps.push((alias.lexeme.to_owned(), OldType::Int));
 
         if let TT::PuncComma = _r[0].typ {
             r = &_r[1..];
@@ -60,15 +60,7 @@ fn parse_funcdef(tokens: &[Token]) -> Result<(SFuncDef, &[Token]), io::Error> {
     }
     let (_, r) = eat(r, TT::PuncRightBrace)?;
 
-    Ok((
-        SFuncDef {
-            alias: alias.lexeme.to_string(),
-            typ: Type::Int,
-            fps,
-            body: stmts,
-        },
-        r,
-    ))
+    Ok((SFuncDef { alias: alias.lexeme.to_string(), typ: OldType::Int, fps, body: stmts }, r))
 }
 
 fn parse_vardef(tokens: &[Token]) -> Result<(SVarDef, &[Token]), io::Error> {
@@ -84,7 +76,7 @@ fn parse_vardef(tokens: &[Token]) -> Result<(SVarDef, &[Token]), io::Error> {
                 Ok((
                     SVarDef {
                         alias: alias.lexeme.to_owned(),
-                        typ: Type::Int,
+                        typ: OldType::Int,
                         expr: Box::new(expr),
                     },
                     r,
@@ -162,10 +154,9 @@ fn parse_vardef(tokens: &[Token]) -> Result<(SVarDef, &[Token]), io::Error> {
                 },
                 _t => todo!(),
             },
-            t => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("token not recognizable {:?}", t),
-            )),
+            t => {
+                Err(io::Error::new(io::ErrorKind::Other, format!("token not recognizable {:?}", t)))
+            }
         },
     }
 }
@@ -203,14 +194,7 @@ fn parse_stmt(tokens: &[Token]) -> Result<(SStmt, &[Token]), io::Error> {
                     (None, r)
                 };
 
-                Ok((
-                    SStmt::IfEls {
-                        cond: Box::new(cond),
-                        then: Box::new(then),
-                        els,
-                    },
-                    r,
-                ))
+                Ok((SStmt::IfEls { cond: Box::new(cond), then: Box::new(then), els }, r))
             }
             TT::KeywordWhile => {
                 let (_, r) = eat(r, TT::PuncLeftParen)?;
@@ -220,13 +204,7 @@ fn parse_stmt(tokens: &[Token]) -> Result<(SStmt, &[Token]), io::Error> {
                 let (body, r) = parse_stmt(r)?;
                 let (_, r) = eat(r, TT::PuncRightBrace)?;
 
-                Ok((
-                    SStmt::While {
-                        cond: Box::new(cond),
-                        body: Box::new(body),
-                    },
-                    r,
-                ))
+                Ok((SStmt::While { cond: Box::new(cond), body: Box::new(body) }, r))
             }
             // TT::KeywordFor => {
             //     let (_, r) = mtch(r, TT::PuncLeftParen)?;
@@ -256,10 +234,9 @@ fn parse_stmt(tokens: &[Token]) -> Result<(SStmt, &[Token]), io::Error> {
             //         r,
             //     ))
             // }
-            t => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("token not recognizable {:?}", t),
-            )),
+            t => {
+                Err(io::Error::new(io::ErrorKind::Other, format!("token not recognizable {:?}", t)))
+            }
         },
     }
 }
@@ -280,11 +257,7 @@ fn parse_rel(tokens: &[Token]) -> Result<(SExpr, &[Token]), io::Error> {
             while let Ok((op, _r)) = parse_rel_op(r) {
                 let (right, _r) = parse_term(_r)?;
 
-                cur_node = SExpr::RelE {
-                    op,
-                    l: Box::new(cur_node),
-                    r: Box::new(right),
-                };
+                cur_node = SExpr::RelE { op, l: Box::new(cur_node), r: Box::new(right) };
 
                 r = _r;
             }
@@ -351,10 +324,9 @@ fn parse_rel_op(tokens: &[Token]) -> Result<(SRelOp, &[Token]), io::Error> {
                     )),
                 },
             },
-            t => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("token not recognizable {:?}", t),
-            )),
+            t => {
+                Err(io::Error::new(io::ErrorKind::Other, format!("token not recognizable {:?}", t)))
+            }
         },
     }
 }
@@ -371,11 +343,7 @@ fn parse_term(tokens: &[Token]) -> Result<(SExpr, &[Token]), io::Error> {
             while let Ok((op, _r)) = parse_term_op(r) {
                 let (right, _r) = parse_factor(_r)?;
 
-                cur_node = SExpr::BinE {
-                    op,
-                    l: Box::new(cur_node),
-                    r: Box::new(right),
-                };
+                cur_node = SExpr::BinE { op, l: Box::new(cur_node), r: Box::new(right) };
 
                 r = _r;
             }
@@ -390,10 +358,9 @@ fn parse_term_op(tokens: &[Token]) -> Result<(SBinOp, &[Token]), io::Error> {
         [f, r @ ..] => match f.typ {
             TT::Plus => Ok((SBinOp::Add, r)),
             TT::Minus => Ok((SBinOp::Sub, r)),
-            t => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("token not recognizable {:?}", t),
-            )),
+            t => {
+                Err(io::Error::new(io::ErrorKind::Other, format!("token not recognizable {:?}", t)))
+            }
         },
     }
 }
@@ -409,11 +376,7 @@ fn parse_factor(tokens: &[Token]) -> Result<(SExpr, &[Token]), io::Error> {
             while let Ok((op, _r)) = parse_factor_op(r) {
                 let (right, _r) = parse_atom(_r)?;
 
-                cur_node = SExpr::BinE {
-                    op,
-                    l: Box::new(cur_node),
-                    r: Box::new(right),
-                };
+                cur_node = SExpr::BinE { op, l: Box::new(cur_node), r: Box::new(right) };
 
                 r = _r;
             }
@@ -429,10 +392,9 @@ fn parse_factor_op(tokens: &[Token]) -> Result<(SBinOp, &[Token]), io::Error> {
         [f, r @ ..] => match f.typ {
             TT::Star => Ok((SBinOp::Mult, r)),
             TT::Slash => Ok((SBinOp::Div, r)),
-            t => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("token not recognizable {:?}", t),
-            )),
+            t => {
+                Err(io::Error::new(io::ErrorKind::Other, format!("token not recognizable {:?}", t)))
+            }
         },
     }
 }
@@ -458,10 +420,7 @@ fn parse_funcapp(tokens: &[Token]) -> Result<(SExpr, &[Token]), io::Error> {
 
                 match left {
                     SExpr::VarApp(alias) => Ok((SExpr::FuncApp { alias, aps }, r)),
-                    _ => Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        "expected alias".to_string(),
-                    )),
+                    _ => Err(io::Error::new(io::ErrorKind::Other, "expected alias".to_string())),
                 }
             } else {
                 Ok((left, r0))
@@ -483,10 +442,9 @@ fn parse_atom(tokens: &[Token]) -> Result<(SExpr, &[Token]), io::Error> {
             )),
             TT::KeywordTrue => Ok((SExpr::Bool(true), r)),
             TT::KeywordFalse => Ok((SExpr::Bool(false), r)),
-            t => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("token not recognizable {:?}", t),
-            )),
+            t => {
+                Err(io::Error::new(io::ErrorKind::Other, format!("token not recognizable {:?}", t)))
+            }
         },
     }
 }

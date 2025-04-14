@@ -1,12 +1,9 @@
-use crate::{LambdaType, SBinOp, SDef, SExpr, SFuncDef, SPrg, SStmt, Tnv, Type};
+use crate::{LambdaType, OldType, SBinOp, SDef, SExpr, SFuncDef, SPrg, SStmt, Tnv};
 use std::collections::HashMap;
 use std::io;
 
-pub fn type_prg(prg: &SPrg) -> Result<Type, io::Error> {
-    let mut tnv = Tnv {
-        fnv: HashMap::new(),
-        vnv: HashMap::new(),
-    };
+pub fn type_prg(prg: &SPrg) -> Result<OldType, io::Error> {
+    let mut tnv = Tnv { fnv: HashMap::new(), vnv: HashMap::new() };
 
     let _ = prg
         .iter()
@@ -16,10 +13,7 @@ pub fn type_prg(prg: &SPrg) -> Result<Type, io::Error> {
                 let type_check = type_func(fd, &tnv, ltnv).map(|t| {
                     tnv.fnv.insert(
                         fd.alias.clone(),
-                        LambdaType {
-                            fp: fd.fps.iter().map(|(_, t)| t.clone()).collect(),
-                            body: t,
-                        },
+                        LambdaType { fp: fd.fps.iter().map(|(_, t)| t.clone()).collect(), body: t },
                     );
                 });
                 type_check
@@ -31,10 +25,7 @@ pub fn type_prg(prg: &SPrg) -> Result<Type, io::Error> {
     Ok(tnv
         .fnv
         .get("main")
-        .ok_or(io::Error::new(
-            io::ErrorKind::Other,
-            "main function not found",
-        ))?
+        .ok_or(io::Error::new(io::ErrorKind::Other, "main function not found"))?
         .body
         .clone())
 }
@@ -42,8 +33,8 @@ pub fn type_prg(prg: &SPrg) -> Result<Type, io::Error> {
 pub fn type_func(
     fd: &SFuncDef,
     gnv: &Tnv,
-    mut ltnv: HashMap<String, Type>,
-) -> Result<Type, io::Error> {
+    mut ltnv: HashMap<String, OldType>,
+) -> Result<OldType, io::Error> {
     //      Γ [e1 <- T1], ... [en <- Tn] ⊢ B : T2
     // -------------------------------------------------------
     //    Γ ⊢ (lambda e1:T1 ... en:Tn B) : (T1 * ... * Tn -> T2)
@@ -57,9 +48,9 @@ pub fn type_func(
         .map(|stmt| type_stmt(stmt, gnv, &mut ltnv))
         .collect::<Result<Vec<_>, _>>()?
         .iter()
-        .try_fold(Type::Void, |prev_t, next_t| match (&prev_t, next_t) {
-            (_, Type::Void) => Ok(prev_t),
-            (Type::Void, _) => Ok(next_t.clone()),
+        .try_fold(OldType::Void, |prev_t, next_t| match (&prev_t, next_t) {
+            (_, OldType::Void) => Ok(prev_t),
+            (OldType::Void, _) => Ok(next_t.clone()),
             (prev_t, next_t) => {
                 if prev_t == next_t {
                     Ok(prev_t.clone())
@@ -81,16 +72,13 @@ pub fn type_func(
 pub fn type_stmt(
     stmt: &SStmt,
     gnv: &Tnv,
-    ltnv: &mut HashMap<String, Type>,
-) -> Result<Type, io::Error> {
+    ltnv: &mut HashMap<String, OldType>,
+) -> Result<OldType, io::Error> {
     match stmt {
         SStmt::IfEls { cond, then, els } => {
             let ct = type_expr(cond, gnv, ltnv)?;
             let tt = type_stmt(then, gnv, ltnv)?;
-            let et = els
-                .as_ref()
-                .map(|els| type_stmt(els, gnv, ltnv))
-                .transpose()?;
+            let et = els.as_ref().map(|els| type_stmt(els, gnv, ltnv)).transpose()?;
 
             // todo (for now):
             // 3. tt and et are Stmt, not Vec<Stmt>
@@ -98,7 +86,7 @@ pub fn type_stmt(
 
             match et {
                 Some(et) => {
-                    if ct == Type::Bool && tt == et {
+                    if ct == OldType::Bool && tt == et {
                         Ok(tt)
                     } else {
                         Err(io::Error::new(io::ErrorKind::Other, "type error"))
@@ -120,11 +108,15 @@ pub fn type_stmt(
     }
 }
 
-pub fn type_expr(e: &SExpr, gtnv: &Tnv, ltnv: &HashMap<String, Type>) -> Result<Type, io::Error> {
+pub fn type_expr(
+    e: &SExpr,
+    gtnv: &Tnv,
+    ltnv: &HashMap<String, OldType>,
+) -> Result<OldType, io::Error> {
     match e {
         // ---------------------intros (axioms)-------------------------
-        SExpr::Int(_) => Ok(Type::Int),   // ⊢ n : Int
-        SExpr::Bool(_) => Ok(Type::Bool), // ⊢ b : Bool
+        SExpr::Int(_) => Ok(OldType::Int),   // ⊢ n : Int
+        SExpr::Bool(_) => Ok(OldType::Bool), // ⊢ b : Bool
         // ---------------------elims (rules)--------------------------
         SExpr::UnaryE { op: _, l } => type_expr(l, gtnv, ltnv),
         SExpr::BinE { op, l, r } => match op {
@@ -134,7 +126,7 @@ pub fn type_expr(e: &SExpr, gtnv: &Tnv, ltnv: &HashMap<String, Type>) -> Result<
                 // ------------------------ BIN_OP
                 //     ⊢ e1 + e2 : Int
                 match (type_expr(l, gtnv, ltnv)?, type_expr(r, gtnv, ltnv)?) {
-                    (Type::Int, Type::Int) => Ok(Type::Int),
+                    (OldType::Int, OldType::Int) => Ok(OldType::Int),
                     _ => Err(io::Error::new(io::ErrorKind::Other, "type error")),
                 }
             } // perserves distinctions between types
