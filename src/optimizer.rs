@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::{parser::START, AddFields, ConstantFields, Instr, Type};
+use crate::{parser::START, rep::{Type, Instr, data::{AddFields, ConstantFields}}};
 
 impl Instr {
     pub fn peephole(self) -> Self { // many optimizations become peepholes with sea of nodes representation:
@@ -14,6 +14,7 @@ impl Instr {
     fn eval_type(&self) -> Type {
         // typer.rs
         match self {
+            Instr::Scope(scope_fields) => todo!(),
             Instr::Start(start_fields) => todo!(),
             Instr::Return(return_fields) => todo!(),
             Instr::Constant(constant_fields) => constant_fields.typ,

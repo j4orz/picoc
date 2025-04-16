@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{collections::{HashMap, VecDeque}, fmt::Debug, sync::Arc};
 
 // pub mod evaluator;
 // pub mod allocator;
@@ -10,14 +8,12 @@ use std::sync::Arc;
 pub mod lexer;
 pub mod optimizer;
 pub mod parser;
-// pub mod parser_ast;
-
-
+pub mod parser_ast;
+pub mod rep;
 // pub mod typer;
 // pub mod visualizer;
 
 macro_rules! common_struct {
-
     ($(#[$meta:meta])* $vis:vis struct $name:ident $body:tt) => {
         $(#[$meta])*
         #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -60,148 +56,6 @@ common_enum! { pub enum OldType { Int, Bool, Void } } // Cond(Type::Bool, Box<Ty
 common_struct! { pub struct Vnv { fnv: HashMap<String, LambdaVal>, vnv: HashMap<String, i32> }} // todo, -> Val
 common_struct! { pub struct LambdaVal { pub fp: Vec<String>, pub body: Vec<SStmt>} } // fp's only need types (tags) if implementing safety dynamically
 common_enum! { pub enum Val { Int(i32), Bool(bool), Str(String) } }
-
-// *****************************************************************************
-// *************************** CONTROL ***************************
-// *****************************************************************************
-
-// FIXME: no static mut
-static mut ID: i128 = 0;
-pub fn fresh_id() -> i128 {
-    unsafe {
-        ID += 1;
-        ID
-    }
-
-}
-
-
-// ******************** STATICS (TYPES) + DYNAMICS (VALUES) ********************
-
-// these types construct a lattice, which is a partially ordered set with unique
-// least upper bounds and greatest lower bounds
-// see: https://en.wikipedia.org/wiki/Lattice_(order)
-#[derive(Debug, Copy, Clone, PartialEq)]
-#[rustfmt::skip]
-pub enum Type { Bot, Top, Simple, Int(i128) }
-impl Type {
-    fn is_constant(&self) -> bool {
-        match self {
-            Type::Bot => false,
-            Type::Top => true,
-            Type::Simple => todo!(),
-            Type::Int(_) => true,
-        }
-    }
-}
-
-// NB: the type for all instruction variant constructors (Self::new()) default
-// to Type::Bot since peephole optimizations are pessimistically monotonic
-// over the lattice.
-#[derive(Debug, Clone,)]
-#[rustfmt::skip]
-pub enum Instr {
-    Start(StartFields), Return(ReturnFields), // control
-    Constant(ConstantFields), Add(AddFields), Sub(SubFields), Mul(MulFields), Div(DivFields), Neg(NegFields), // data
-}
-
-// ********************************** CONTROL **********************************
-// NB: control instructions still have a type because the sea of nodes
-// representation is homogenous (instruction agnostic). control instructions
-// can be peephole optimized with TODO: (phi functions.)
-
-#[derive(Debug, Clone)]
-#[rustfmt::skip] pub struct StartFields {
-    id: i128, typ: Type,
-}
-impl StartFields {
-    fn new() -> Self {
-        Self { id: fresh_id(), typ: Type::Bot }
-    }
-}
-
-#[rustfmt::skip]
-#[derive(Debug, Clone)]
-pub struct ReturnFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, ctrl: Arc<Instr>, data: Arc<Instr> }
-impl ReturnFields {
-    fn new(ctrl: Arc<Instr>, data: Instr) -> Self {
-        let ud = vec![ctrl, Arc::new(data)];
-        let (ctrl, data) = (ud[0].clone(), ud[1].clone());
-
-        Self { id: fresh_id(), typ: Type::Bot, ud, du: vec![], ctrl, data }
-    }
-}
-
-// ************************************ DATA ***********************************
-
-#[rustfmt::skip] 
-#[derive(Clone, Debug)]
-pub struct ConstantFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Instr> }
-impl ConstantFields {
-    fn new(ctrl: Arc<Instr>, typ: Type) -> Self {
-        Self {
-            id: fresh_id(),
-            typ,
-            ud: vec![ctrl], // phantom edge to start enabling graph traversal
-            du: vec![],
-        }
-    }
-}
-
-#[rustfmt::skip]
-#[derive(Debug, Clone)]
-pub struct AddFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl AddFields {
-    fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: Type::Bot, ud, du: vec![], x, y }
-    }
-}
-
-#[rustfmt::skip]
-#[derive(Debug, Clone)]
-pub struct SubFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl SubFields {
-    fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
-    }
-}
-
-#[rustfmt::skip]
-#[derive(Debug, Clone)]
-pub struct MulFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl MulFields {
-    fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
-    }
-}
-
-#[rustfmt::skip]
-#[derive(Debug, Clone)]
-pub struct DivFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl DivFields {
-    fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
-    }
-}
-
-#[rustfmt::skip]
-#[derive(Debug, Clone)]
-pub struct NegFields { id: i128, typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl NegFields {
-    fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
-    }
-}
 
 // TODO: for loops, etc.
 type _SugaredPrg = Vec<()>;

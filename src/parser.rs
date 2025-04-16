@@ -1,4 +1,11 @@
-use crate::{lexer::{Token, TT}, AddFields, ConstantFields, DivFields, Instr, MulFields, Scope, ReturnFields, StartFields, SubFields, Type};
+use crate::{
+    lexer::{Token, TT},
+    rep::{
+        Type, Instr, ScopeFields,
+        ctl::{ReturnFields, StartFields},
+        data::{AddFields, ConstantFields, DivFields, MulFields, SubFields},
+    }
+};
 use std::{io, sync::{Arc, LazyLock, Mutex}};
 
 // NB1. each function in the parser will parse in two ways
@@ -21,7 +28,7 @@ use std::{io, sync::{Arc, LazyLock, Mutex}};
 //      code (vec<list>) is relaxed to a partial order of a graph
 
 pub static START: Instr = Instr::Start(StartFields { id: 0, typ: Type::Bot });
-static SCOPE: LazyLock<Mutex<Scope>> = LazyLock::new(|| Mutex::new(Scope::new()));
+static SCOPE: LazyLock<Mutex<ScopeFields>> = LazyLock::new(|| Mutex::new(ScopeFields::new()));
 
 pub fn parse_prg(tokens: &[Token]) -> Result<Instr, io::Error> {
     let r = tokens;
@@ -38,13 +45,13 @@ pub fn parse_prg(tokens: &[Token]) -> Result<Instr, io::Error> {
 }
 
 fn parse_block(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
-    SCOPE.lock().unwrap().push();
+    SCOPE.lock().unwrap().push_nv();
     let (mut foo, mut r) = (None, tokens);
     while let Ok((bar, _r)) = parse_stmt(r) {
         foo = Some(bar);
         r = _r;
     };
-    SCOPE.lock().unwrap().pop();
+    SCOPE.lock().unwrap().pop_nv();
     Ok((foo.unwrap(), r))
 }
 
