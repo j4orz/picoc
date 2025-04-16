@@ -1,74 +1,128 @@
 // ************************************ DATA ***********************************
 
-use std::sync::Arc;
-
+use std::rc::Rc;
 use super::{fresh_id, Instr, Type};
 
 #[rustfmt::skip] 
 #[derive(Clone, Debug)]
-pub struct ConstantFields { id: i128, pub typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Instr> }
-impl ConstantFields {
-    pub fn new(ctrl: Arc<Instr>, typ: Type) -> Self {
+pub struct Constant { id: i128, pub typ: Type, pub inputs: Vec<Rc<Box<dyn Instr>>>, pub outputs: Vec<Rc<Box<dyn Instr>>> }
+impl Constant {
+    pub fn new(ctrl: Box<dyn Instr>, typ: Type) -> Self {
         Self {
             id: fresh_id(),
             typ,
-            ud: vec![ctrl], // phantom edge to start enabling graph traversal
-            du: vec![],
+            inputs: vec![Rc::new(ctrl)], // phantom edge to start enabling graph traversal
+            outputs: vec![],
         }
     }
 }
+impl Instr for Constant {
+    fn add_input(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
+    }
 
-#[rustfmt::skip]
-#[derive(Debug, Clone)]
-pub struct AddFields { id: i128, pub typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, pub x: Arc<Instr>, pub y: Arc<Instr> }
-impl AddFields {
-    pub fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: Type::Bot, ud, du: vec![], x, y }
+    fn add_output(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
     }
 }
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct SubFields { id: i128, pub typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl SubFields {
-    pub fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+pub struct Add { id: i128, pub typ: Type, pub inputs: Vec<Rc<Box<dyn Instr>>>, pub outputs: Vec<Rc<Box<dyn Instr>>>, x: Rc<Box<dyn Instr>>, y: Rc<Box<dyn Instr>> }
+impl Add {
+    pub fn new(x: Box<dyn Instr>, y: Box<dyn Instr>) -> Self {
+        let inputs = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (inputs[0].clone(), inputs[1].clone());
+        Self { id: fresh_id(), typ: Type::Bot, inputs, outputs: vec![], x, y }
+    }
+}
+impl Instr for Add {
+    fn add_input(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
+    }
+
+    fn add_output(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
     }
 }
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct MulFields { id: i128, pub typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl MulFields {
-    pub fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+pub struct Sub { id: i128, pub typ: Type, pub inputs: Vec<Rc<Box<dyn Instr>>>, pub outputs: Vec<Rc<Box<dyn Instr>>>, x: Rc<Box<dyn Instr>>, y: Rc<Box<dyn Instr>> }
+impl Sub {
+    pub fn new(x: Box<dyn Instr>, y: Box<dyn Instr>) -> Self {
+        let inputs = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (inputs[0].clone(), inputs[1].clone());
+        Self { id: fresh_id(), typ: todo!(), inputs, outputs: todo!(), x, y }
+    }
+}
+impl Instr for Sub {
+    fn add_input(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
+    }
+
+    fn add_output(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
     }
 }
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct DivFields { id: i128, pub typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl DivFields {
-    pub fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+pub struct Mul { id: i128, pub typ: Type, pub inputs: Vec<Rc<Box<dyn Instr>>>, pub outputs: Vec<Rc<Box<dyn Instr>>>, x: Rc<Box<dyn Instr>>, y: Rc<Box<dyn Instr>> }
+impl Mul {
+    pub fn new(x: Box<dyn Instr>, y: Box<dyn Instr>) -> Self {
+        let inputs = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (inputs[0].clone(), inputs[1].clone());
+        Self { id: fresh_id(), typ: todo!(), inputs, outputs: todo!(), x, y }
+    }
+}
+impl Instr for Mul {
+    fn add_input(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
+    }
+
+    fn add_output(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
     }
 }
 
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct NegFields { id: i128, pub typ: Type, ud: Vec<Arc<Instr>>, du: Vec<Arc<Instr>>, x: Arc<Instr>, y: Arc<Instr> }
-impl NegFields {
-    pub fn new(x: Instr, y: Instr) -> Self {
-        let ud = vec![Arc::new(x), Arc::new(y)];
-        let (x, y) = (ud[0].clone(), ud[1].clone());
-        Self { id: fresh_id(), typ: todo!(), ud, du: todo!(), x, y }
+pub struct Div { id: i128, pub typ: Type, pub inputs: Vec<Rc<Box<dyn Instr>>>, pub outputs: Vec<Rc<Box<dyn Instr>>>, x: Rc<Box<dyn Instr>>, y: Rc<Box<dyn Instr>> }
+impl Div {
+    pub fn new(x: Box<dyn Instr>, y: Box<dyn Instr>) -> Self {
+        let inputs = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (inputs[0].clone(), inputs[1].clone());
+        Self { id: fresh_id(), typ: todo!(), inputs, outputs: todo!(), x, y }
+    }
+}
+impl Instr for Div {
+    fn add_input(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
+    }
+
+    fn add_output(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
+    }
+}
+
+#[rustfmt::skip]
+#[derive(Debug, Clone)]
+pub struct Neg { id: i128, pub typ: Type, pub inputs: Vec<Rc<Box<dyn Instr>>>, pub outputs: Vec<Rc<Box<dyn Instr>>>, x: Rc<Box<dyn Instr>>, y: Rc<Box<dyn Instr>> }
+impl Neg {
+    pub fn new(x: Box<dyn Instr>, y: Box<dyn Instr>) -> Self {
+        let inputs = vec![Rc::new(x), Rc::new(y)];
+        let (x, y) = (inputs[0].clone(), inputs[1].clone());
+        Self { id: fresh_id(), typ: todo!(), inputs, outputs: todo!(), x, y }
+    }
+}
+
+impl Instr for Neg {
+    fn add_input(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
+    }
+
+    fn add_output(&mut self, input: Box<dyn Instr>) -> () {
+        todo!()
     }
 }

@@ -1,34 +1,58 @@
 pub mod ctl;
 pub mod data;
 
-use std::collections::{HashMap, VecDeque};
-use ctl::{ReturnFields, StartFields};
-use data::{AddFields, ConstantFields, DivFields, MulFields, NegFields, SubFields};
-
+use std::{collections::{HashMap, VecDeque}, fmt::Debug, rc::Rc, sync::Arc};
+use thiserror::Error;
 
 // FIXME: no static mut
 static mut ID: i128 = 0;
-pub fn fresh_id() -> i128 {
-    unsafe {
-        ID += 1;
-        ID
-    }
+pub fn fresh_id() -> i128 { unsafe { ID += 1; ID } }
 
+#[derive(Error, Debug)]
+pub enum FooError {
+    #[error("broadcast mismatch")]
+    BroadcastMismatch,
+    #[error("double define")]
+    DoubleDefine,
+    #[error("unknown scope error")]
+    Unknown,
 }
 
 // ******************** 1. SCOPE ********************
 #[derive(Debug, Clone)]
-pub struct ScopeFields { pub nvs: VecDeque<HashMap<String, i128>>, typ: Type }
-impl ScopeFields {
-    pub fn new() -> Self { ScopeFields { nvs: VecDeque::new(), typ: Type::Bot } }
+pub struct Scope { typ: Type, inputs: Vec<Rc<Box<dyn Instr>>>, outputs: Vec<Rc<Box<dyn Instr>>>, pub nvs: VecDeque<HashMap<String, usize>> }
+impl Scope {
+    pub fn new() -> Self { Scope { typ: Type::Bot, inputs: todo!(), outputs: todo!(), nvs: VecDeque::new(), } }
     pub fn push_nv(&mut self) -> () { self.nvs.push_back(HashMap::new()); }
     pub fn pop_nv(&mut self) -> () { self.nvs.pop_back(); }
 
-    fn var_def(&self) -> Instr {
+    fn var_def(&mut self, alias: String, expr: Box<dyn Instr>) -> Result<&mut Self, FooError> {
+        let cur_nv = self.nvs.back_mut().ok_or(FooError::Unknown)?;
+        if cur_nv.contains_key(&alias) {
+            Err(FooError::DoubleDefine)
+        } else {
+            cur_nv.insert(alias, self.inputs.len());
+            // self.add_input(expr);
+            // expr.add_output(self);
+            Ok(self)
+        }
+    }
+
+    fn var_apply(&self) -> Arc<dyn Instr> {
+        todo!()
+    }
+}
+
+// NB2. the scope (a stack of nv) neither data nor control is still represented
+//      as an instruction within the graph to leverage def-use information in
+//      liveness analysis. the scope instruction has no outputs. that is, no
+//      instructions that use the scope instruction itself
+impl Instr for Scope {
+    fn add_input(&mut self, input: Box<dyn Instr>) -> () {
         todo!()
     }
 
-    fn var_apply(&self) -> Instr {
+    fn add_output(&mut self, input: Box<dyn Instr>) -> () {
         todo!()
     }
 }
@@ -51,42 +75,22 @@ impl Type {
     }
 }
 
-// enforcing data via set/get methods on trait
-trait TypedInstr {
-    fn get_type(&self) -> Type;
-}
-
-impl TypedInstr for Instr {
-    fn get_type(&self) -> Type {
-        match self {
-            Instr::Start(fields) => fields.typ,
-            Instr::Return(fields) => fields.typ,
-            Instr::Constant(fields) => fields.typ,
-            Instr::Add(fields) => fields.typ,
-            Instr::Sub(fields) => fields.typ,
-            Instr::Mul(fields) => fields.typ,
-            Instr::Div(fields) => fields.typ,
-            Instr::Neg(fields) => fields.typ,
-            Instr::Scope(_) => todo!("Scope doesn't have a type field yet"), // Or return a default/special type
-        }
-    }
-}
-
 // ******************** 2. DYNAMICS(VALUES) ********************
+// trait objects are used over generics and trait bounds because instructions in
+// sea of nodes are heteregenous, since the latter gets monomorphized with one
+// single type at compilation time.
+pub trait Instr : Debug  {
+    fn add_input(&mut self, input: Box<dyn Instr>) -> ();
+    fn add_output(&mut self, input: Box<dyn Instr>) -> ();
+}
+
 // NB1. the type for all instruction variant constructors (Self::new()) default
 //      to Type::Bot since peephole optimizations are pessimistically monotonic
 //      over the lattice.
-
-// NB2. the scope (a stack of nv) neither data nor control is still represented
-//      as an instruction within the graph to leverage def-use information in
-//      liveness analysis. the scope instruction has no outputs. that is, no
-//      instructions that use the scope instruction itself
-#[derive(Debug, Clone)]
-#[rustfmt::skip]
-pub enum Instr {
-    Scope(ScopeFields), // scope
-    Start(StartFields), Return(ReturnFields), // control
-    Constant(ConstantFields), Add(AddFields), Sub(SubFields), Mul(MulFields), Div(DivFields), Neg(NegFields), // data
-}
-
-
+// #[derive(Debug, Clone)]
+// #[rustfmt::skip]
+// pub enum InstrFoo {
+//     Scope(ScopeFields), // scope
+//     Start(Start), Return(ReturnFields), // control
+//     Constant(ConstantFields), Add(AddFields), Sub(SubFields), Mul(MulFields), Div(DivFields), Neg(NegFields), // data
+// }

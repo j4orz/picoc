@@ -1,10 +1,7 @@
 use crate::{
+    rep::{ctl::{Return, Start}, data::{Add, Constant, Div, Mul, Sub}, Instr, Type},
     lexer::{Token, TT},
-    rep::{
-        Type, Instr, ScopeFields,
-        ctl::{ReturnFields, StartFields},
-        data::{AddFields, ConstantFields, DivFields, MulFields, SubFields},
-    }
+    optimizer::peephole,
 };
 use std::{io, sync::{Arc, LazyLock, Mutex}};
 
@@ -27,10 +24,10 @@ use std::{io, sync::{Arc, LazyLock, Mutex}};
 //      for more details. this means that the total ordering of straightline
 //      code (vec<list>) is relaxed to a partial order of a graph
 
-pub static START: Instr = Instr::Start(StartFields { id: 0, typ: Type::Bot });
+pub static START: Start = Start { id: 0, typ: Type::Bot };
 static SCOPE: LazyLock<Mutex<ScopeFields>> = LazyLock::new(|| Mutex::new(ScopeFields::new()));
 
-pub fn parse_prg(tokens: &[Token]) -> Result<Instr, io::Error> {
+pub fn parse_prg(tokens: &[Token]) -> Result<Box<dyn Instr>, io::Error> {
     let r = tokens;
     let (_, r) = require(r, TT::KeywordInt)?;
     let (_, r) = require(r, TT::Alias)?;
@@ -44,7 +41,7 @@ pub fn parse_prg(tokens: &[Token]) -> Result<Instr, io::Error> {
     if r.is_empty() { Ok(stmt) } else { Err(io::Error::new(io::ErrorKind::Other,format!("expected empty token stream, {:?}", r)))}
 }
 
-fn parse_block(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+fn parse_block(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
     SCOPE.lock().unwrap().push_nv();
     let (mut foo, mut r) = (None, tokens);
     while let Ok((bar, _r)) = parse_stmt(r) {
@@ -55,7 +52,7 @@ fn parse_block(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
     Ok((foo.unwrap(), r))
 }
 
-fn parse_stmt(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+fn parse_stmt(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
     match tokens {
         [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
         [f, r @ ..] => match f.typ {
@@ -71,7 +68,7 @@ fn parse_stmt(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
             TT::KeywordRet => {
                 let (expr, r) = parse_term( r)?;
                 let (_, r) = require(r, TT::PuncSemiColon)?;
-                let retinstr = Instr::Return(ReturnFields::new(Arc::new(START.clone()), expr));
+                let retinstr = Box::new(Return::new(Arc::new(START.clone()), expr));
                 Ok((retinstr, r))
             }
             t => Err(io::Error::new(
@@ -82,11 +79,11 @@ fn parse_stmt(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
     }
 }
 
-fn parse_expr(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+fn parse_expr(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
     parse_term(tokens)
 }
 
-fn parse_term(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+fn parse_term(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
     let (x, r) = parse_factor( tokens)?;
 
     match r {
@@ -94,11 +91,11 @@ fn parse_term(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
         [f, _r @ ..] => match f.typ {
             TT::Plus => {
                 let (y, r) = parse_factor(_r)?;
-                Ok((Instr::Add(AddFields::new(x, y)).peephole(), r))
+                Ok((peephole(Box::new(Add::new(x, y))), r))
             }
             TT::Minus => {
                 let (y, r) = parse_factor( _r)?;
-                Ok((Instr::Sub(SubFields::new(x, y)), r))
+                Ok((Box::new(Sub::new(x, y)), r))
             }
             t => {
                 println!("moose {:?}", r);
@@ -108,7 +105,7 @@ fn parse_term(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
     }
 }
 
-fn parse_factor(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+fn parse_factor(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
     let (x, r) = parse_atom( tokens)?;
 
     match r {
@@ -116,27 +113,27 @@ fn parse_factor(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
         [f, _r @ ..] => match f.typ {
             TT::Star => {
                 let (y, r) = parse_atom( _r)?;
-                Ok((Instr::Mul(MulFields::new(x, y)), r))
+                Ok((Box::new(Mul::new(x, y)), r))
             }
             TT::Slash => {
                 let (y, r) = parse_atom( _r)?;
-                Ok((Instr::Div(DivFields::new(x, y)), r))
+                Ok((Box::new(Div::new(x, y)), r))
             }
             _ => Ok((x, r)),
         },
     }
 }
 
-fn parse_atom(tokens: &[Token]) -> Result<(Instr, &[Token]), io::Error> {
+fn parse_atom(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
     match tokens {
         [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
         [f, r @ ..] => match f.typ {
             TT::LiteralInt => {
-                let constantinstr = Instr::Constant(ConstantFields::new(
+                let constantinstr = Constant::new(
                     Arc::new(START.clone()),
                     Type::Int(f.lexeme.parse().unwrap()),
-                ));
-                Ok((constantinstr, r))
+                );
+                Ok((Box::new(constantinstr), r))
             }
             // TT:Alias ...
             t => Err(io::Error::new(
