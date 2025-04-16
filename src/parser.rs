@@ -1,9 +1,7 @@
 use crate::{
-    rep::{ctl::{Return, Start}, data::{Add, Constant, Div, Mul, Sub}, Instr, Type},
-    lexer::{Token, TT},
-    optimizer::peephole,
+    lexer::{Token, TT}, optimizer::peephole, rep::{ctl::{Return, Start}, data::{Add, Constant, Div, Mul, Sub}, Instr, Scope, Type}
 };
-use std::{io, sync::{Arc, LazyLock, Mutex}};
+use std::io;
 
 // NB1. each function in the parser will parse in two ways
 //        a. conditionally (SUM/OR): match tokens(first, rest) first.typ { TT::Foo => {}, TT::Bar => {}, TT::Baz => {} }
@@ -24,123 +22,131 @@ use std::{io, sync::{Arc, LazyLock, Mutex}};
 //      for more details. this means that the total ordering of straightline
 //      code (vec<list>) is relaxed to a partial order of a graph
 
-pub static START: Start = Start { id: 0, typ: Type::Bot };
-static SCOPE: LazyLock<Mutex<ScopeFields>> = LazyLock::new(|| Mutex::new(ScopeFields::new()));
+struct Parser { start: Start, scope: Scope }
+impl Parser {
+    pub fn new() -> Self {
+        Self {
+            start: Start::new(),
+            scope: Scope::new(),
+        }
+    }
 
-pub fn parse_prg(tokens: &[Token]) -> Result<Box<dyn Instr>, io::Error> {
-    let r = tokens;
-    let (_, r) = require(r, TT::KeywordInt)?;
-    let (_, r) = require(r, TT::Alias)?;
-    let (_, r) = require(r, TT::PuncLeftParen)?;
-    let (_, r) = require(r, TT::PuncRightParen)?;
-
-    let (_, r) = require(r, TT::PuncLeftBrace)?;
-    let (stmt, r) = parse_stmt(r)?;
-    let (_, r) = require(r, TT::PuncRightBrace)?;
-
-    if r.is_empty() { Ok(stmt) } else { Err(io::Error::new(io::ErrorKind::Other,format!("expected empty token stream, {:?}", r)))}
-}
-
-fn parse_block(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
-    SCOPE.lock().unwrap().push_nv();
-    let (mut foo, mut r) = (None, tokens);
-    while let Ok((bar, _r)) = parse_stmt(r) {
-        foo = Some(bar);
-        r = _r;
-    };
-    SCOPE.lock().unwrap().pop_nv();
-    Ok((foo.unwrap(), r))
-}
-
-fn parse_stmt(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
-    match tokens {
-        [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
-        [f, r @ ..] => match f.typ {
-            TT::KeywordInt => {
-                let (alias, r) = require(r, TT::Alias)?;
-                let (_, r) = require(r, TT::Equals)?;
-                let (expr, r) = parse_expr(r)?;
-                let (_, r) = require(r, TT::PuncSemiColon)?;
-                
-                // Ok((SStmt::Asnmt(a), r))
-                todo!()
+    pub fn parse_prg(&self, tokens: &[Token]) -> Result<Box<dyn Instr>, io::Error> {
+        let r = tokens;
+        let (_, r) = require(r, TT::KeywordInt)?;
+        let (_, r) = require(r, TT::Alias)?;
+        let (_, r) = require(r, TT::PuncLeftParen)?;
+        let (_, r) = require(r, TT::PuncRightParen)?;
+    
+        let (_, r) = require(r, TT::PuncLeftBrace)?;
+        let (stmt, r) = self.parse_stmt(r)?;
+        let (_, r) = require(r, TT::PuncRightBrace)?;
+    
+        if r.is_empty() { Ok(stmt) } else { Err(io::Error::new(io::ErrorKind::Other,format!("expected empty token stream, {:?}", r)))}
+    }
+    
+    fn parse_block<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+        // SCOPE.lock().unwrap().push_nv();
+        let (mut foo, mut r) = (None, tokens);
+        while let Ok((bar, _r)) = self.parse_stmt(r) {
+            foo = Some(bar);
+            r = _r;
+        };
+        // SCOPE.lock().unwrap().pop_nv();
+        Ok((foo.unwrap(), r))
+    }
+    
+    fn parse_stmt<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+        match tokens {
+            [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
+            [f, r @ ..] => match f.typ {
+                TT::KeywordInt => {
+                    let (alias, r) = require(r, TT::Alias)?;
+                    let (_, r) = require(r, TT::Equals)?;
+                    let (expr, r) = self.parse_expr(r)?;
+                    let (_, r) = require(r, TT::PuncSemiColon)?;
+                    
+                    // Ok((SStmt::Asnmt(a), r))
+                    todo!()
+                },
+                TT::KeywordRet => {
+                    let (expr, r) = self.parse_term( r)?;
+                    let (_, r) = require(r, TT::PuncSemiColon)?;
+                    let retinstr = Box::new(Return::new(Box::new(self.start.clone()), expr));
+                    Ok((retinstr, r))
+                }
+                t => Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("expected: {:?} got: {:?}", TT::KeywordRet, t),
+                )),
             },
-            TT::KeywordRet => {
-                let (expr, r) = parse_term( r)?;
-                let (_, r) = require(r, TT::PuncSemiColon)?;
-                let retinstr = Box::new(Return::new(Arc::new(START.clone()), expr));
-                Ok((retinstr, r))
-            }
-            t => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("expected: {:?} got: {:?}", TT::KeywordRet, t),
-            )),
-        },
+        }
     }
-}
 
-fn parse_expr(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
-    parse_term(tokens)
-}
-
-fn parse_term(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
-    let (x, r) = parse_factor( tokens)?;
-
-    match r {
-        [] => panic!(),
-        [f, _r @ ..] => match f.typ {
-            TT::Plus => {
-                let (y, r) = parse_factor(_r)?;
-                Ok((peephole(Box::new(Add::new(x, y))), r))
-            }
-            TT::Minus => {
-                let (y, r) = parse_factor( _r)?;
-                Ok((Box::new(Sub::new(x, y)), r))
-            }
-            t => {
-                println!("moose {:?}", r);
-                Ok((x, r))
-            }
-        },
+    fn parse_expr<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+        self.parse_term(tokens)
     }
-}
-
-fn parse_factor(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
-    let (x, r) = parse_atom( tokens)?;
-
-    match r {
-        [] => panic!(),
-        [f, _r @ ..] => match f.typ {
-            TT::Star => {
-                let (y, r) = parse_atom( _r)?;
-                Ok((Box::new(Mul::new(x, y)), r))
-            }
-            TT::Slash => {
-                let (y, r) = parse_atom( _r)?;
-                Ok((Box::new(Div::new(x, y)), r))
-            }
-            _ => Ok((x, r)),
-        },
+    
+    fn parse_term<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+        let (x, r) = self.parse_factor( tokens)?;
+    
+        match r {
+            [] => panic!(),
+            [f, _r @ ..] => match f.typ {
+                TT::Plus => {
+                    let (y, r) = self.parse_factor(_r)?;
+                    Ok((peephole(Box::new(Add::new(x, y))), r))
+                }
+                TT::Minus => {
+                    let (y, r) = self.parse_factor( _r)?;
+                    Ok((Box::new(Sub::new(x, y)), r))
+                }
+                t => {
+                    println!("moose {:?}", r);
+                    Ok((x, r))
+                }
+            },
+        }
     }
-}
+    
+    fn parse_factor<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+        let (x, r) = self.parse_atom( tokens)?;
+    
+        match r {
+            [] => panic!(),
+            [f, _r @ ..] => match f.typ {
+                TT::Star => {
+                    let (y, r) = self.parse_atom( _r)?;
+                    Ok((Box::new(Mul::new(x, y)), r))
+                }
+                TT::Slash => {
+                    let (y, r) = self.parse_atom( _r)?;
+                    Ok((Box::new(Div::new(x, y)), r))
+                }
+                t => Ok((x, r)),
+            },
+        }
+    }
 
-fn parse_atom(tokens: &[Token]) -> Result<(Box<dyn Instr>, &[Token]), io::Error> {
-    match tokens {
-        [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
-        [f, r @ ..] => match f.typ {
-            TT::LiteralInt => {
-                let constantinstr = Constant::new(
-                    Arc::new(START.clone()),
-                    Type::Int(f.lexeme.parse().unwrap()),
-                );
-                Ok((Box::new(constantinstr), r))
-            }
-            // TT:Alias ...
-            t => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("expected: {:?} got: {:?}", TT::LiteralInt, t),
-            )),
-        },
+    fn parse_atom<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+        match tokens {
+            [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
+            [f, r @ ..] => match f.typ {
+                TT::LiteralInt => {
+                    let constantinstr = Constant::new(
+                        Box::new(self.start.clone()),
+                        Type::Int(f.lexeme.parse().unwrap()),
+                    );
+
+                    Ok((Box::new(constantinstr), r))
+                }
+                // TT:Alias ...
+                t => Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("expected: {:?} got: {:?}", TT::LiteralInt, t),
+                )),
+            },
+        }
     }
 }
 
@@ -178,8 +184,9 @@ mod test_arith {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
 
+        let parser = super::Parser::new();
         let tokens = lexer::lex(&chars).unwrap();
-        let graph = super::parse_prg(&tokens).unwrap();
+        let graph = parser.parse_prg(&tokens).unwrap();
         insta::assert_debug_snapshot!(graph, @r###"
         Return(
             ReturnFields {
@@ -247,8 +254,9 @@ mod test_arith {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
 
+        let parser = super::Parser::new();
         let tokens = lexer::lex(&chars).unwrap();
-        let graph = super::parse_prg(&tokens).unwrap();
+        let graph = parser.parse_prg(&tokens).unwrap();
         insta::assert_debug_snapshot!(graph, @r###"
         Return(
             ReturnFields {
@@ -325,8 +333,9 @@ mod test_bindings {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
 
+        let parser = super::Parser::new();
         let tokens = lexer::lex(&chars).unwrap();
-        let graph = super::parse_prg(&tokens).unwrap();
+        let graph = parser.parse_prg(&tokens).unwrap();
         insta::assert_debug_snapshot!(graph, @r"");
     }
 }
