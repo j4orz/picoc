@@ -2,11 +2,12 @@ pub mod ctl;
 pub mod data;
 pub mod scope;
 
-use std::fmt::Debug;
-use ctl::Start;
+use std::{fmt::Debug, rc::Rc, cell::RefCell};
 use data::Int;
 
-/// NB: instructions in ctl and data submodules 
+/// NB: all instructions in ctl and data submodules use rc for indirection
+///     even if reference counting is not needed (count=1) to keep all
+///     types consistent. that is, rc colors the type of pointer.
 
 // FIXME: no static mut
 static mut ID: i128 = 0;
@@ -23,22 +24,28 @@ pub fn fresh_id() -> i128 { unsafe { ID += 1; ID } }
 pub enum TypeKind { Bot, Top, Simple, Int(i128) } // see: https://en.wikipedia.org/wiki/Lattice_(order)
 pub enum InstrKind { Start, Return, Int, Add, Sub, Mul, Div, Scope }
 
-pub trait Instr : Debug  {
-    // default:
-    fn peephole(self: Box<Self>, start: Start) -> Box<dyn Instr> where Self: Sized + 'static {
+pub trait Instr : Debug {
+    // accessors
+    fn kind(&self) -> InstrKind;
+    fn inputs(&self) -> &Vec<Rc<dyn Instr>>;
+    fn outputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>>;
+
+    fn output_init(self: Rc<Self>) where Self: Sized + 'static {
+        for i in self.inputs() {
+            i.outputs().borrow_mut().push(self.clone() as Rc<dyn Instr>);
+        }
+    }
+
+    // optimizer
+    fn peephole(self: Rc<Self>, start: Rc<dyn Instr>) -> Rc<dyn Instr> where Self: Sized + 'static {
         let typ = self.eval_type();
-        let instr: Box<dyn Instr> = match self.kind() {
+        let instr: Rc<dyn Instr> = match self.kind() {
             InstrKind::Int => self,
-            _ => if typ.is_constant() { Box::new(Int::new(Box::new(start), typ))} else { self },
+            _ => if typ.is_constant() { Rc::new(Int::new(start.clone(), typ))} else { self },
         };
         return instr;
     }
     fn eval_type(&self) -> TypeKind { TypeKind::Bot }
-    fn add_input(&mut self, _input: Box<dyn Instr>) -> () {}
-    fn add_output(&mut self, _input: Box<dyn Instr>) -> () {}
-
-    // required:
-    fn kind(&self) -> InstrKind;
 }
 
 impl TypeKind {
