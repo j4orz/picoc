@@ -5,9 +5,15 @@ pub mod scope;
 use std::{fmt::Debug, rc::Rc, cell::RefCell};
 use data::Int;
 
-/// NB: all instructions in ctl and data submodules use rc for indirection
-///     even if reference counting is not needed (count=1) to keep all
-///     types consistent. that is, rc colors the type of pointer.
+/// NB1: all instructions in ctl and data submodules use rc for indirection
+///      even if reference counting is not needed (count=1) to keep all
+///      types consistent. that is, rc colors the type of pointer.
+/// 
+/// NB2: all instruction constructors that implement the instr trait must call
+///      .init_outputs() — this is invariant is enforced by the human reviewer.
+///      type state combined with field encapsulation can be used to enforce
+///      callers outside the module, but does not enforce within the module for
+///      library implementors
 
 // FIXME: no static mut
 static mut ID: i128 = 0;
@@ -25,11 +31,13 @@ pub enum TypeKind { Bot, Top, Simple, Int(i128) } // see: https://en.wikipedia.o
 pub enum InstrKind { Start, Return, Int, Add, Sub, Mul, Div, Scope }
 
 pub trait Instr : Debug {
+    // type State<T> where T: 
+
     // accessors
     fn kind(&self) -> InstrKind;
     fn inputs(&self) -> &Vec<Rc<dyn Instr>>;
     fn outputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>>;
-    fn init_outputs(self: &Rc<Self>) where Self: Sized + 'static {
+    fn fill_dus(self: &Rc<Self>) where Self: Sized + 'static {
         for i in self.inputs() {
             i.outputs().borrow_mut().push(self.clone() as Rc<dyn Instr>);
         }

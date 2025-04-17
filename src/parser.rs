@@ -23,16 +23,16 @@ use std::{io, rc::Rc};
 //      for more details. this means that the total ordering of straightline
 //      code (vec<list>) is relaxed to a partial order of a graph
 
-pub struct Parser { pub start: Rc<Box<dyn Instr>>, scope: Scope }
+pub struct Parser { pub start: Rc<dyn Instr>, scope: Scope }
 impl Parser {
     pub fn new(start: Start) -> Self {
         Self {
-            start: Rc::new(Box::new(start)),
+            start: Rc::new(start),
             scope: Scope::new(),
         }
     }
 
-    pub fn parse_prg(&self, tokens: &[Token]) -> Result<Box<dyn Instr>, io::Error> {
+    pub fn parse_prg(&self, tokens: &[Token]) -> Result<Rc<dyn Instr>, io::Error> {
         let r = tokens;
         let (_, r) = require(r, TT::KeywordInt)?;
         let (_, r) = require(r, TT::Alias)?;
@@ -46,7 +46,7 @@ impl Parser {
         if r.is_empty() { Ok(stmt) } else { Err(io::Error::new(io::ErrorKind::Other,format!("expected empty token stream, {:?}", r)))}
     }
     
-    fn parse_block<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+    fn parse_block<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
         // SCOPE.lock().unwrap().push_nv();
         let (mut foo, mut r) = (None, tokens);
         while let Ok((bar, _r)) = self.parse_stmt(r) {
@@ -57,7 +57,7 @@ impl Parser {
         Ok((foo.unwrap(), r))
     }
     
-    fn parse_stmt<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+    fn parse_stmt<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
         match tokens {
             [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
             [f, r @ ..] => match f.typ {
@@ -74,7 +74,7 @@ impl Parser {
                     let (expr, r) = self.parse_term( r)?;
                     let (_, r) = require(r, TT::PuncSemiColon)?;
                     let retinstr = Return::new(self.start.clone(), expr);
-                    Ok((Box::new(retinstr), r))
+                    Ok((retinstr, r))
                 }
                 t => Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -84,11 +84,11 @@ impl Parser {
         }
     }
 
-    fn parse_expr<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+    fn parse_expr<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
         self.parse_term(tokens)
     }
     
-    fn parse_term<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+    fn parse_term<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
         let (x, r) = self.parse_factor( tokens)?;
     
         match r {
@@ -96,11 +96,11 @@ impl Parser {
             [f, _r @ ..] => match f.typ {
                 TT::Plus => {
                     let (y, r) = self.parse_factor(_r)?;
-                    Ok((Box::new(Add::new(x, y)).peephole(self.start.clone()), r))
+                    Ok((Add::new(x, y).peephole(self.start.clone()), r))
                 }
                 TT::Minus => {
                     let (y, r) = self.parse_factor( _r)?;
-                    Ok((Box::new(Sub::new(x, y)), r))
+                    Ok((Sub::new(x, y), r))
                 }
                 t => {
                     println!("moose {:?}", r);
@@ -110,7 +110,7 @@ impl Parser {
         }
     }
     
-    fn parse_factor<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+    fn parse_factor<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
         let (x, r) = self.parse_atom( tokens)?;
     
         match r {
@@ -118,18 +118,18 @@ impl Parser {
             [f, _r @ ..] => match f.typ {
                 TT::Star => {
                     let (y, r) = self.parse_atom( _r)?;
-                    Ok((Box::new(Mul::new(x, y)), r))
+                    Ok((Mul::new(x, y), r))
                 }
                 TT::Slash => {
                     let (y, r) = self.parse_atom( _r)?;
-                    Ok((Box::new(Div::new(x, y)), r))
+                    Ok((Div::new(x, y), r))
                 }
                 t => Ok((x, r)),
             },
         }
     }
 
-    fn parse_atom<'a>(&self, tokens: &'a [Token]) -> Result<(Box<dyn Instr>, &'a [Token]), io::Error> {
+    fn parse_atom<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
         match tokens {
             [] => Err(io::Error::new(io::ErrorKind::Other, "expected: {:?} got an empty token stream")),
             [f, r @ ..] => match f.typ {
@@ -139,7 +139,7 @@ impl Parser {
                         TypeKind::Int(f.lexeme.parse().unwrap()),
                     );
 
-                    Ok((Box::new(constantinstr), r))
+                    Ok((constantinstr, r))
                 }
                 // TT:Alias ...
                 t => Err(io::Error::new(

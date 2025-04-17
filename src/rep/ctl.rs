@@ -8,9 +8,9 @@ use super::{fresh_id, Instr, InstrKind, TypeKind};
 #[derive(Debug, Clone)]
 #[rustfmt::skip] pub struct Start { pub id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Rc<dyn Instr>>> }
 impl Start {
-    pub fn new() -> Rc<dyn Instr> {
+    pub fn new() -> Rc<Self> {
         let instr = Rc::new(Self { id: fresh_id(), typ: TypeKind::Bot, inputs: vec![], outputs: RefCell::new(vec![]) });
-        instr.init_outputs();
+        instr.fill_dus();
         instr
     }
 }
@@ -23,10 +23,10 @@ impl Instr for Start {
 #[derive(Debug, Clone)]
 pub struct Return { pub id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Rc<dyn Instr>>> }
 impl Return {
-    pub fn new(ctrl: Rc<dyn Instr>, data: Rc<dyn Instr>) -> Rc<dyn Instr> {
+    pub fn new(ctrl: Rc<dyn Instr>, data: Rc<dyn Instr>) -> Rc<Self> {
         let inputs = vec![ctrl, data];
         let instr = Rc::new(Self { id: fresh_id(), typ: TypeKind::Bot, inputs, outputs: RefCell::new(vec![])});
-        instr.init_outputs();
+        instr.fill_dus();
         instr
     }
 
