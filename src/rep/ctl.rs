@@ -7,7 +7,13 @@ use super::{fresh_id, Instr, InstrKind, TypeKind};
 
 #[derive(Debug, Clone)]
 #[rustfmt::skip] pub struct Start { pub id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Rc<dyn Instr>>> }
-impl Start { pub fn new() -> Self { Self { id: fresh_id(), typ: TypeKind::Bot, inputs: vec![], outputs: RefCell::new(vec![]) }}}
+impl Start {
+    pub fn new() -> Rc<dyn Instr> {
+        let instr = Rc::new(Self { id: fresh_id(), typ: TypeKind::Bot, inputs: vec![], outputs: RefCell::new(vec![]) });
+        instr.init_outputs();
+        instr
+    }
+}
 impl Instr for Start {
     fn kind(&self) -> InstrKind { InstrKind::Start }
     fn inputs(&self) -> &Vec<Rc<dyn Instr>> { &self.inputs }
@@ -17,9 +23,11 @@ impl Instr for Start {
 #[derive(Debug, Clone)]
 pub struct Return { pub id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Rc<dyn Instr>>> }
 impl Return {
-    pub fn new(ctrl: Rc<dyn Instr>, data: Rc<dyn Instr>) -> Self {
+    pub fn new(ctrl: Rc<dyn Instr>, data: Rc<dyn Instr>) -> Rc<dyn Instr> {
         let inputs = vec![ctrl, data];
-        Self { id: fresh_id(), typ: TypeKind::Bot, inputs, outputs: RefCell::new(vec![])}
+        let instr = Rc::new(Self { id: fresh_id(), typ: TypeKind::Bot, inputs, outputs: RefCell::new(vec![])});
+        instr.init_outputs();
+        instr
     }
 
     fn _ctl() -> Box<dyn Instr> { todo!() }

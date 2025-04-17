@@ -29,8 +29,7 @@ pub trait Instr : Debug {
     fn kind(&self) -> InstrKind;
     fn inputs(&self) -> &Vec<Rc<dyn Instr>>;
     fn outputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>>;
-
-    fn output_init(self: Rc<Self>) where Self: Sized + 'static {
+    fn init_outputs(self: &Rc<Self>) where Self: Sized + 'static {
         for i in self.inputs() {
             i.outputs().borrow_mut().push(self.clone() as Rc<dyn Instr>);
         }
@@ -41,7 +40,7 @@ pub trait Instr : Debug {
         let typ = self.eval_type();
         let instr: Rc<dyn Instr> = match self.kind() {
             InstrKind::Int => self,
-            _ => if typ.is_constant() { Rc::new(Int::new(start.clone(), typ))} else { self },
+            _ => if typ.is_constant() { Int::new(start.clone(), typ) } else { self },
         };
         return instr;
     }
