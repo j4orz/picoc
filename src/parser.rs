@@ -96,7 +96,7 @@ impl Parser {
             [f, _r @ ..] => match f.typ {
                 TT::Plus => {
                     let (y, r) = self.parse_factor(_r)?;
-                    Ok((Box::new(Add::new(x, y)).peephole(self.start), r))
+                    Ok((Box::new(Add::new(x, y)).peephole(self.start.clone()), r))
                 }
                 TT::Minus => {
                     let (y, r) = self.parse_factor( _r)?;
@@ -135,7 +135,7 @@ impl Parser {
             [f, r @ ..] => match f.typ {
                 TT::LiteralInt => {
                     let constantinstr = Int::new(
-                        Box::new(self.start.clone()),
+                        self.start.clone(),
                         TypeKind::Int(f.lexeme.parse().unwrap()),
                     );
 
