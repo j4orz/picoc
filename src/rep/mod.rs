@@ -6,6 +6,8 @@ use std::fmt::Debug;
 use ctl::Start;
 use data::Int;
 
+/// NB: instructions in ctl and data submodules 
+
 // FIXME: no static mut
 static mut ID: i128 = 0;
 pub fn fresh_id() -> i128 { unsafe { ID += 1; ID } }
@@ -32,8 +34,8 @@ pub trait Instr : Debug  {
         return instr;
     }
     fn eval_type(&self) -> TypeKind { TypeKind::Bot }
-    fn add_input(&mut self, input: Box<dyn Instr>) -> () {}
-    fn add_output(&mut self, input: Box<dyn Instr>) -> () {}
+    fn add_input(&mut self, _input: Box<dyn Instr>) -> () {}
+    fn add_output(&mut self, _input: Box<dyn Instr>) -> () {}
 
     // required:
     fn kind(&self) -> InstrKind;
