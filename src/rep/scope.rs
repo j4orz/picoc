@@ -1,7 +1,7 @@
 use std::{collections::{HashMap, VecDeque}, fmt::Debug, rc::Rc, sync::Arc};
 use thiserror::Error;
 
-use super::{Instr, InstrKind, TypeKind};
+use super::{Instr, TypeKind};
 
 #[derive(Error, Debug)]
 pub enum FooError {
@@ -42,6 +42,6 @@ impl Scope {
 //     as an instruction within the graph to leverage def-use information in
 //     liveness analysis. the scope instruction has no outputs. that is, no
 //     instructions that use the scope instruction itself
-impl Instr for Scope {
-    fn kind(&self) -> InstrKind { InstrKind::Scope }
-}
+// impl Instr for Scope {
+//     fn kind(&self) -> InstrKind { InstrKind::Scope }
+// }

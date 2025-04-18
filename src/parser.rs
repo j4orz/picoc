@@ -25,9 +25,9 @@ use std::{io, rc::Rc};
 
 pub struct Parser { pub start: Rc<dyn Instr>, scope: Scope }
 impl Parser {
-    pub fn new(start: Start) -> Self {
+    pub fn new(start: Rc<Start>) -> Self {
         Self {
-            start: Rc::new(start),
+            start: start,
             scope: Scope::new(),
         }
     }
@@ -46,16 +46,16 @@ impl Parser {
         if r.is_empty() { Ok(stmt) } else { Err(io::Error::new(io::ErrorKind::Other,format!("expected empty token stream, {:?}", r)))}
     }
     
-    fn parse_block<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
-        // SCOPE.lock().unwrap().push_nv();
-        let (mut foo, mut r) = (None, tokens);
-        while let Ok((bar, _r)) = self.parse_stmt(r) {
-            foo = Some(bar);
-            r = _r;
-        };
-        // SCOPE.lock().unwrap().pop_nv();
-        Ok((foo.unwrap(), r))
-    }
+    // fn parse_block<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
+    //     // SCOPE.lock().unwrap().push_nv();
+    //     let (mut foo, mut r) = (None, tokens);
+    //     while let Ok((bar, _r)) = self.parse_stmt(r) {
+    //         foo = Some(bar);
+    //         r = _r;
+    //     };
+    //     // SCOPE.lock().unwrap().pop_nv();
+    //     Ok((foo.unwrap(), r))
+    // }
     
     fn parse_stmt<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), io::Error> {
         match tokens {
@@ -103,7 +103,6 @@ impl Parser {
                     Ok((Sub::new(x, y), r))
                 }
                 t => {
-                    println!("moose {:?}", r);
                     Ok((x, r))
                 }
             },
@@ -170,154 +169,135 @@ fn require(tokens: &[Token], tt: TT) -> Result<(&Token, &[Token]), io::Error> {
     }
 }
 
-// #[cfg(test)]
-// mod test_arith {
-//     use crate::lexer;
-//     use std::fs;
+#[cfg(test)]
+mod test_arith {
+    use crate::{lexer, rep::ctl::Start};
+    use std::fs;
 
-//     const TEST_DIR: &str = "tests/fixtures/snap/shared/arith";
+    const TEST_DIR: &str = "tests/fixtures/snap/shared/arith";
 
-//     #[test]
-//     fn lit() {
-//         let chars = fs::read(format!("{TEST_DIR}/lit.c"))
-//             .expect("file dne")
-//             .iter()
-//             .map(|b| *b as char)
-//             .collect::<Vec<_>>();
+    #[test]
+    fn lit() {
+        let chars = fs::read(format!("{TEST_DIR}/lit.c"))
+            .expect("file dne")
+            .iter()
+            .map(|b| *b as char)
+            .collect::<Vec<_>>();
+    
+        let tokens = lexer::lex(&chars).unwrap();
+        let parser = super::Parser::new(Start::new());
+        let graph = parser.parse_prg(&tokens).unwrap();
+        insta::assert_debug_snapshot!(graph, @r###"
+        Return {
+            id: 3,
+            typ: Bot,
+            inputs: [
+                Start {
+                    id: 1,
+                    typ: Bot,
+                    inputs: [],
+                    outputs: RefCell {
+                        value: [
+                            (Weak),
+                            (Weak),
+                        ],
+                    },
+                },
+                Int {
+                    _id: 2,
+                    typ: Int(
+                        8,
+                    ),
+                    inputs: [
+                        Start {
+                            id: 1,
+                            typ: Bot,
+                            inputs: [],
+                            outputs: RefCell {
+                                value: [
+                                    (Weak),
+                                    (Weak),
+                                ],
+                            },
+                        },
+                    ],
+                    outputs: RefCell {
+                        value: [
+                            (Weak),
+                        ],
+                    },
+                },
+            ],
+            outputs: RefCell {
+                value: [],
+            },
+        }
+        "###);
+    }
 
-//         let parser = super::Parser::new();
-//         let tokens = lexer::lex(&chars).unwrap();
-//         let graph = parser.parse_prg(&tokens).unwrap();
-//         insta::assert_debug_snapshot!(graph, @r###"
-//         Return(
-//             ReturnFields {
-//                 id: 2,
-//                 typ: Bot,
-//                 ud: [
-//                     Start(
-//                         StartFields {
-//                             id: 0,
-//                             typ: Bot,
-//                         },
-//                     ),
-//                     Constant(
-//                         ConstantFields {
-//                             id: 1,
-//                             typ: Int(
-//                                 8,
-//                             ),
-//                             ud: [
-//                                 Start(
-//                                     StartFields {
-//                                         id: 0,
-//                                         typ: Bot,
-//                                     },
-//                                 ),
-//                             ],
-//                             du: [],
-//                         },
-//                     ),
-//                 ],
-//                 du: [],
-//                 ctrl: Start(
-//                     StartFields {
-//                         id: 0,
-//                         typ: Bot,
-//                     },
-//                 ),
-//                 data: Constant(
-//                     ConstantFields {
-//                         id: 1,
-//                         typ: Int(
-//                             8,
-//                         ),
-//                         ud: [
-//                             Start(
-//                                 StartFields {
-//                                     id: 0,
-//                                     typ: Bot,
-//                                 },
-//                             ),
-//                         ],
-//                         du: [],
-//                     },
-//                 ),
-//             },
-//         )
-//         "###);
-//     }
+    #[test]
+    fn add() {
+        let chars = fs::read(format!("{TEST_DIR}/add.c"))
+            .expect("file dne")
+            .iter()
+            .map(|b| *b as char)
+            .collect::<Vec<_>>();
 
-//     #[test]
-//     fn add() {
-//         let chars = fs::read(format!("{TEST_DIR}/add.c"))
-//             .expect("file dne")
-//             .iter()
-//             .map(|b| *b as char)
-//             .collect::<Vec<_>>();
-
-//         let parser = super::Parser::new();
-//         let tokens = lexer::lex(&chars).unwrap();
-//         let graph = parser.parse_prg(&tokens).unwrap();
-//         insta::assert_debug_snapshot!(graph, @r###"
-//         Return(
-//             ReturnFields {
-//                 id: 5,
-//                 typ: Bot,
-//                 ud: [
-//                     Start(
-//                         StartFields {
-//                             id: 0,
-//                             typ: Bot,
-//                         },
-//                     ),
-//                     Constant(
-//                         ConstantFields {
-//                             id: 4,
-//                             typ: Int(
-//                                 19,
-//                             ),
-//                             ud: [
-//                                 Start(
-//                                     StartFields {
-//                                         id: 0,
-//                                         typ: Bot,
-//                                     },
-//                                 ),
-//                             ],
-//                             du: [],
-//                         },
-//                     ),
-//                 ],
-//                 du: [],
-//                 ctrl: Start(
-//                     StartFields {
-//                         id: 0,
-//                         typ: Bot,
-//                     },
-//                 ),
-//                 data: Constant(
-//                     ConstantFields {
-//                         id: 4,
-//                         typ: Int(
-//                             19,
-//                         ),
-//                         ud: [
-//                             Start(
-//                                 StartFields {
-//                                     id: 0,
-//                                     typ: Bot,
-//                                 },
-//                             ),
-//                         ],
-//                         du: [],
-//                     },
-//                 ),
-//             },
-//         )
-//         "###);
-//     }
-// }
-
+        let parser = super::Parser::new(Start::new());
+        let tokens = lexer::lex(&chars).unwrap();
+        let graph = parser.parse_prg(&tokens).unwrap();
+        insta::assert_debug_snapshot!(graph, @r###"
+        Return {
+            id: 6,
+            typ: Bot,
+            inputs: [
+                Start {
+                    id: 1,
+                    typ: Bot,
+                    inputs: [],
+                    outputs: RefCell {
+                        value: [
+                            (Weak),
+                            (Weak),
+                            (Weak),
+                            (Weak),
+                        ],
+                    },
+                },
+                Int {
+                    _id: 5,
+                    typ: Int(
+                        19,
+                    ),
+                    inputs: [
+                        Start {
+                            id: 1,
+                            typ: Bot,
+                            inputs: [],
+                            outputs: RefCell {
+                                value: [
+                                    (Weak),
+                                    (Weak),
+                                    (Weak),
+                                    (Weak),
+                                ],
+                            },
+                        },
+                    ],
+                    outputs: RefCell {
+                        value: [
+                            (Weak),
+                        ],
+                    },
+                },
+            ],
+            outputs: RefCell {
+                value: [],
+            },
+        }
+        "###);
+    }
+}
 
 // #[cfg(test)]
 // mod test_bindings {

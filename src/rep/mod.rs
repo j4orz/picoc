@@ -2,12 +2,14 @@ pub mod ctl;
 pub mod data;
 pub mod scope;
 
-use std::{fmt::Debug, rc::Rc, cell::RefCell};
+use std::{cell::RefCell, fmt::Debug, rc::{Rc, Weak}};
 use data::Int;
 
 /// NB1: all instructions in ctl and data submodules use rc for indirection
-///      even if reference counting is not needed (count=1) to keep all
-///      types consistent. that is, rc colors the type of pointer.
+///      even if reference counting is not needed (count=1) to keep all types
+///      consistent. that is, the use of rc/weak for some nodes in the graph
+///      colors the type of pointer for all nodes in the graph to keep types
+///      consistent.
 /// 
 /// NB2: all instruction constructors that implement the instr trait must call
 ///      .init_outputs() — this is invariant is enforced by the human reviewer.
@@ -19,31 +21,30 @@ use data::Int;
 static mut ID: i128 = 0;
 pub fn fresh_id() -> i128 { unsafe { ID += 1; ID } }
 
-// trait objects (dynamic polymorphism) are used over generics and trait bounds
-// because instructions in sea of nodes are heteregenous, since the latter gets
-// monomorphized (static polymorphism) with one single type at compilation time.
-// NB: trait objects only provide polymorphism on behavior, not data. so methods
-//     with return TypeKind (statics) and InstrKind (dynamics) return types are
-//     declared
+// since the generics with trait bounds get monomorphized (static polymorphism),
+// trait objects (dynamic polymorphism) is used because sea of nodes
+// heterogeneity needs dynamic dispatch. since trait objects only provide
+// polymorphism on behavior and not data, required methods lift individual struct
+// data to shared trait behavior. a single instr enum with variant-specific data
+// would need to do the opposite, and "lower" shared behavior. a heterogenous
+// graph implemented in rust is nasty regardless of how you slice/dice it.
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TypeKind { Bot, Top, Simple, Int(i128) } // see: https://en.wikipedia.org/wiki/Lattice_(order)
 pub enum InstrKind { Start, Return, Int, Add, Sub, Mul, Div, Scope }
 
 pub trait Instr : Debug {
-    // type State<T> where T: 
-
-    // accessors
     fn kind(&self) -> InstrKind;
     fn inputs(&self) -> &Vec<Rc<dyn Instr>>;
-    fn outputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>>;
+    fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>>;
+    fn eval_type(&self) -> TypeKind { TypeKind::Bot }
+
     fn fill_dus(self: &Rc<Self>) where Self: Sized + 'static {
         for i in self.inputs() {
-            i.outputs().borrow_mut().push(self.clone() as Rc<dyn Instr>);
+            i.outputs().borrow_mut().push(Rc::downgrade(&(self.clone() as Rc<dyn Instr>)));
         }
     }
 
-    // optimizer
     fn peephole(self: Rc<Self>, start: Rc<dyn Instr>) -> Rc<dyn Instr> where Self: Sized + 'static {
         let typ = self.eval_type();
         let instr: Rc<dyn Instr> = match self.kind() {
@@ -51,8 +52,10 @@ pub trait Instr : Debug {
             _ => if typ.is_constant() { Int::new(start.clone(), typ) } else { self },
         };
         return instr;
-    }
-    fn eval_type(&self) -> TypeKind { TypeKind::Bot }
+    } // NB1: self is Drop if instr no longer aliases it, possibly cascading to children
+      // NB2: weak pointers on the children of the dropped instr are left for now,
+      //      which can be cleared eagerly (from parent's dealloc) or lazily
+      //      (on child's processing) in the future
 }
 
 impl TypeKind {
