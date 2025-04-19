@@ -65,15 +65,15 @@ impl Scope {
     }
 
 
-    pub fn write(self: &Rc<Self>, alias: String, expr: Rc<dyn Instr>) -> Result<&Rc<Self>, ScopeError> {
+    pub fn write(self: &Rc<Self>, alias: String, expr: Rc<dyn Instr>) -> Result<(), ScopeError> {
         let mut nvs = self.nvs.borrow_mut();
         let cur_nv = nvs.back_mut().ok_or(ScopeError::NoNvExists)?;
         if cur_nv.contains_key(&alias) {
             Err(ScopeError::DoubleDefine)
         } else {
-            let foo = self.add_child(expr);
-            cur_nv.insert(alias, self.inputs.borrow().len());
-            Ok(self)
+            self.add_child(expr);
+            cur_nv.insert(alias, self.inputs.borrow().len()-1);
+            Ok(())
         }
     }
 }
