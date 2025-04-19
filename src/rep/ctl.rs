@@ -6,27 +6,25 @@ use std::{cell::RefCell, rc::{Rc, Weak}};
 use super::{fresh_id, Instr, InstrKind, TypeKind};
 
 #[derive(Debug, Clone)]
-#[rustfmt::skip] pub struct Start { pub id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
+#[rustfmt::skip] pub struct Start { id: i128, typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 impl Start {
     pub fn new() -> Rc<Self> {
-        let instr = Rc::new(Self { id: fresh_id(), typ: TypeKind::Bot, inputs: vec![], outputs: RefCell::new(vec![]) });
-        instr.fill_dus();
+        let instr = Rc::new(Self { id: fresh_id(), typ: TypeKind::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]) });
         instr
     }
 }
 impl Instr for Start {
     fn kind(&self) -> InstrKind { InstrKind::Start }
-    fn inputs(&self) -> &Vec<Rc<dyn Instr>> { &self.inputs }
+    fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
     fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
 }
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
-pub struct Return { pub id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
+pub struct Return { id: i128, typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 impl Return {
     pub fn new(ctrl: Rc<dyn Instr>, data: Rc<dyn Instr>) -> Rc<Self> {
-        let inputs = vec![ctrl, data];
-        let instr = Rc::new(Self { id: fresh_id(), typ: TypeKind::Bot, inputs, outputs: RefCell::new(vec![])});
-        instr.fill_dus();
+        let instr = Rc::new(Self { id: fresh_id(), typ: TypeKind::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![])});
+        instr.add_children(vec![ctrl, data]);
         instr
     }
 
@@ -35,6 +33,6 @@ impl Return {
 }
 impl Instr for Return {
     fn kind(&self) -> InstrKind { InstrKind::Return }
-    fn inputs(&self) -> &Vec<Rc<dyn Instr>> { &self.inputs }
+    fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
     fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
 }

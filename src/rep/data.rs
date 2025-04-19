@@ -2,36 +2,36 @@ use std::{cell::RefCell, rc::{Rc, Weak}};
 use super::{fresh_id, Instr, InstrKind, TypeKind};
 
 #[derive(Clone, Debug)]
-pub struct Int { _id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
+pub struct Int { _id: i128, typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 impl Int {
-    pub fn new(ctl: Rc<dyn Instr>, typ: TypeKind) -> Rc<Self> {
-        let instr = Rc::new(Self{ _id: fresh_id(), typ, inputs: vec![ctl], outputs: RefCell::new(vec![]) });
-        instr.fill_dus();
+    pub fn new(ctrl: Rc<dyn Instr>, typ: TypeKind) -> Rc<Self> {
+        let instr = Rc::new(Self{ _id: fresh_id(), typ, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]) });
+        instr.add_children(vec![ctrl]);
         instr
     }
 }
 impl Instr for Int {
     fn kind(&self) -> InstrKind { InstrKind::Int }
-    fn inputs(&self) -> &Vec<Rc<dyn Instr>> { &self.inputs }
+    fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
     fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
     fn eval_type(&self) -> TypeKind { self.typ }
 }
 
 #[derive(Debug, Clone)]
-pub struct Add { _id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
+pub struct Add { _id: i128, typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 impl Add {
     pub fn new(x: Rc<dyn Instr>, y: Rc<dyn Instr>) -> Rc<Self> {
-        let instr = Rc::new(Self { _id: fresh_id(), typ: TypeKind::Bot, inputs: vec![x, y], outputs: RefCell::new(vec![]) });
-        instr.fill_dus();
+        let instr = Rc::new(Self { _id: fresh_id(), typ: TypeKind::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]) });
+        instr.add_children(vec![x, y]);
         instr
     }
 
-    fn x(&self) -> Rc<dyn Instr> { self.inputs[0].clone() }
-    fn y(&self) -> Rc<dyn Instr> { self.inputs[1].clone() }
+    fn x(&self) -> Rc<dyn Instr> { self.inputs.borrow()[0].clone() }
+    fn y(&self) -> Rc<dyn Instr> { self.inputs.borrow()[1].clone() }
 }
 impl Instr for Add {
     fn kind(&self) -> InstrKind { InstrKind::Add }
-    fn inputs(&self) -> &Vec<Rc<dyn Instr>> { &self.inputs }
+    fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
     fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
     
     fn eval_type(&self) -> TypeKind {
@@ -45,11 +45,11 @@ impl Instr for Add {
 
 
 #[derive(Debug, Clone)]
-pub struct Sub { _id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
+pub struct Sub { _id: i128, typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 impl Sub {
     pub fn new(x: Rc<dyn Instr>, y: Rc<dyn Instr>) -> Rc<Self> {
-        let instr = Rc::new(Self { _id: fresh_id(), typ: TypeKind::Bot, inputs: vec![x, y], outputs: RefCell::new(vec![]) });
-        instr.fill_dus();
+        let instr = Rc::new(Self { _id: fresh_id(), typ: TypeKind::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]) });
+        instr.add_children(vec![x, y]);
         instr
     }
     fn _x() -> Rc<dyn Instr> { todo!() }
@@ -57,17 +57,17 @@ impl Sub {
 }
 impl Instr for Sub {
     fn kind(&self) -> InstrKind { InstrKind::Sub }
-    fn inputs(&self) -> &Vec<Rc<dyn Instr>> { &self.inputs }
+    fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
     fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
 }
 
 
 #[derive(Debug, Clone)]
-pub struct Mul { _id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
+pub struct Mul { _id: i128, typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 impl Mul {
     pub fn new(x: Rc<dyn Instr>, y: Rc<dyn Instr>) -> Rc<Self> {
-        let instr = Rc::new(Self { _id: fresh_id(), typ: TypeKind::Bot, inputs: vec![x, y], outputs: RefCell::new(vec![]) });
-        instr.fill_dus();
+        let instr = Rc::new(Self { _id: fresh_id(), typ: TypeKind::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]) });
+        instr.add_children(vec![x, y]);
         instr
     }
     fn _x() -> Rc<dyn Instr> { todo!() }
@@ -75,17 +75,17 @@ impl Mul {
 }
 impl Instr for Mul {
     fn kind(&self) -> InstrKind { InstrKind::Mul }
-    fn inputs(&self) -> &Vec<Rc<dyn Instr>> { &self.inputs }
+    fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
     fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
 }
 
 
 #[derive(Debug, Clone)]
-pub struct Div { _id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
+pub struct Div { _id: i128, typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 impl Div {
     pub fn new(x: Rc<dyn Instr>, y: Rc<dyn Instr>) -> Rc<dyn Instr> {
-        let instr = Rc::new(Self { _id: fresh_id(), typ: TypeKind::Bot, inputs: vec![x, y], outputs: RefCell::new(vec![]) });
-        instr.fill_dus();
+        let instr = Rc::new(Self { _id: fresh_id(), typ: TypeKind::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]) });
+        instr.add_children(vec![x, y]);
         instr
     }
     fn _x() -> Rc<dyn Instr> { todo!() }
@@ -93,13 +93,13 @@ impl Div {
 }
 impl Instr for Div {
     fn kind(&self) -> InstrKind { InstrKind::Div }
-    fn inputs(&self) -> &Vec<Rc<dyn Instr>> { &self.inputs }
+    fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
     fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
 }
 
 
 // #[derive(Debug, Clone)]
-// pub struct Neg { id: i128, pub typ: TypeKind, pub inputs: Vec<Rc<dyn Instr>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
+// pub struct Neg { id: i128, typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 // impl Neg {
 //     pub fn new(x: Box<dyn Instr>, y: Box<dyn Instr>) -> Rc<dyn Instr> {
 //         let inputs = vec![Rc::new(x), Rc::new(y)];
