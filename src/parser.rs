@@ -1,8 +1,8 @@
 use crate::{
     lexer::{Token, TT},
-    rep::{ctl::{Return, Start}, data::{Add, Div, Int, Mul, Sub}, scope::{Scope, ScopeError}, Instr, TypeKind}
+    rep::{ctl::{Branch, Return, Start}, data::{Add, Div, Int, Mul, Sub}, scope::{Scope, ScopeError, ARG, CTRL}, Instr, MultiInstr, Proj, TypeAndVal}
 };
-use std::{io, rc::Rc};
+use std::{rc::Rc};
 use thiserror::Error;
 
 // NB1. each function in the parser will parse in two ways
@@ -53,12 +53,19 @@ impl Parser {
         let (_, r) = require(r, TT::PuncRightParen)?;
     
         let (_, r) = require(r, TT::PuncLeftBrace)?;
+        self.scope.push_nv();
+        self.scope.write(CTRL.to_owned(), Proj::new(self.start.clone(), 0));
+        self.scope.write(ARG.to_owned(), Proj::new(self.start.clone(), 1));
         let (block, r) = self.parse_block(r)?;
+        self.scope.pop_nv();
+
         let (_, r) = require(r, TT::PuncRightBrace)?;
+        // try_convert block's Rc<dyn Instr> -> Rc<Return>
     
         if r.is_empty() { Ok(block) } else { Err(ParseError::Mismatch { expected: "empty token stream".to_string(), actual: format!("{:?}", r) }) }
     }
     
+    // NB: lexical scope ==> nv's are only pushed/popped in parse_block
     fn parse_block<'a>(&mut self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
         self.scope.push_nv();
         let (mut output, mut r) = (None, tokens);
@@ -70,7 +77,7 @@ impl Parser {
         Ok((output.unwrap(), r))
     }
     
-    fn parse_stmt<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
+    fn parse_stmt<'a>(&mut self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
         match tokens {
             [] => Err(ParseError::Mismatch { expected: "expected: {:?} got an empty token stream".to_string(), actual: "".to_string() }),
             [f, r @ ..] => match f.typ {
@@ -83,8 +90,33 @@ impl Parser {
                     let _ = self.scope.write(alias.lexeme.to_owned(), expr.clone())?;
                     Ok((expr, r))
                 },
+                TT::KeywordIf => {
+                    let (pred, r) = self.parse_expr(r)?;
+                    
+                    let branch = Branch::new(self.scope.read_ctrl(), pred);
+                    let left = Proj::new(branch.clone(), 0).peephole(self.start.clone());
+                    let right = Proj::new(branch, 1).peephole(self.start.clone());
+                    let scope_og = Rc::new((*self.scope).clone()); // TODO: need ascii debugger here to verify
+
+                    // NB: because condtionals are statements and not expressions
+                    //     in C, the return of parse_stmts are not bound and ignored
+
+                    self.scope.write_ctrl(left); // 1. set ctrl
+                    let (_, r) = self.parse_stmt(r)?; // 2. parse
+                    let scope_left = Rc::new((*self.scope).clone()); // 3. alias scope
+
+                    self.scope = scope_og; // reset
+
+                    self.scope.write_ctrl(right); // 1. set ctrl
+                    if r.len() > 1 && r[0].typ == TT::KeywordEls { let (_, r) = self.parse_stmt(r)?; }; // 2. parse
+                    let scope_right = Rc::new((*self.scope).clone()); // 3. alias scope
+
+                    let region = scope_left.merge(&scope_right);
+                    self.scope.write_ctrl(region.clone());
+                    Ok((region, r))
+                },
                 TT::KeywordRet => {
-                    let (expr, r) = self.parse_term( r)?;
+                    let (expr, r) = self.parse_expr( r)?;
                     let (_, r) = require(r, TT::PuncSemiColon)?;
                     let retinstr = Return::new(self.start.clone(), expr);
                     Ok((retinstr, r))
@@ -145,7 +177,7 @@ impl Parser {
                 TT::LiteralInt => {
                     let constantinstr = Int::new(
                         self.start.clone(),
-                        TypeKind::Int(f.lexeme.parse().unwrap()),
+                        TypeAndVal::Int(f.lexeme.parse().unwrap()),
                     );
 
                     Ok((constantinstr, r))
@@ -406,3 +438,25 @@ mod test_bindings {
         "###);
     }
 }
+
+// #[cfg(test)]
+// mod test_controlflow {
+//     use crate::{lexer, rep::ctl::Start};
+//     use std::fs;
+
+//     const TEST_DIR: &str = "tests/fixtures/snap/shared/bindings";
+
+//     #[test]
+//     fn assignment() {
+//         let chars = fs::read(format!("{TEST_DIR}/asnmt_multi_expr_var.c"))
+//             .expect("file dne")
+//             .iter()
+//             .map(|b| *b as char)
+//             .collect::<Vec<_>>();
+
+//             let mut parser = super::Parser::new(Start::new());
+//             let tokens = lexer::lex(&chars).unwrap();
+//             let graph = parser.parse_prg(&tokens).unwrap();
+//         insta::assert_debug_snapshot!(graph, @r"")
+//     }
+// }
