@@ -1,6 +1,8 @@
 use std::{cell::RefCell, collections::{HashMap, VecDeque}, fmt::Debug, rc::{Rc, Weak}};
 use thiserror::Error;
-use super::{Instr, InstrKind, TypeKind};
+use crate::rep::ctl::Region;
+
+use super::{Instr, OpCode, TypeAndVal};
 // NB1: the program scope is a stack of nvs which are themselves maps from
 //      aliases to usizes which are indices into its inputs. every instruction
 //      node is dead on creation unless aliased by the scope node. once an
@@ -35,12 +37,13 @@ pub enum ScopeError {
     NoNvExists,
 }
 enum ScopeOp { Read, Update(Rc<dyn Instr>) }
-
+pub const CTRL: &str = "ctl";
+pub const ARG: &str = "arg";
 
 #[derive(Debug, Clone)]
-pub struct Scope { typ: TypeKind, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>>, nvs: RefCell<VecDeque<HashMap<String, usize>>> }
+pub struct Scope { typ: TypeAndVal, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>>, nvs: RefCell<VecDeque<HashMap<String, usize>>> }
 impl Scope {
-    pub fn new() -> Self { Scope { typ: TypeKind::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]), nvs: RefCell::new(VecDeque::new()) } }
+    pub fn new() -> Self { Scope { typ: TypeAndVal::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]), nvs: RefCell::new(VecDeque::new()) } }
     pub fn push_nv(self: &Rc<Self>) -> () { self.nvs.borrow_mut().push_back(HashMap::new()); }
     pub fn pop_nv(self: &Rc<Self>) -> () { self.nvs.borrow_mut().pop_back(); }
     pub fn read(self: &Rc<Self>, alias: String) -> Result<Rc<dyn Instr>, ScopeError> { self.read_update(alias, ScopeOp::Read, self.nvs.borrow().len()-1) } // &mut self for shared foo. lazy phi.
@@ -64,7 +67,6 @@ impl Scope {
         }
     }
 
-
     pub fn write(self: &Rc<Self>, alias: String, expr: Rc<dyn Instr>) -> Result<(), ScopeError> {
         let mut nvs = self.nvs.borrow_mut();
         let cur_nv = nvs.back_mut().ok_or(ScopeError::NoNvExists)?;
@@ -76,10 +78,19 @@ impl Scope {
             Ok(())
         }
     }
+
+    pub fn write_ctrl(self: &Rc<Self>, ctrl: Rc<dyn Instr>) -> () { todo!() }
+    pub fn read_ctrl(self: &Rc<Self>) -> Rc<dyn Instr> { todo!() }
+    pub fn merge(&self, other: &Rc<Scope>) -> Rc<Region> {
+        // let merge = Region::new();
+        todo!()
+    }
 }
 
 impl Instr for Scope {
-    fn kind(&self) -> InstrKind { InstrKind::Scope }
+    fn kind(&self) -> OpCode { OpCode::Scope }
     fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
     fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
+    
+    fn idealize(&self) -> Rc<dyn Instr> { todo!() }
 }

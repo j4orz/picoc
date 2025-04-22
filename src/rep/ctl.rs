@@ -1,6 +1,12 @@
-// NB: control instructions still have a type because the sea of nodes
-// representation is homogenous (instruction agnostic). control instructions
-// can be peephole optimized with TODO: (phi functions.)
+// NB1: control instructions still have a type because the sea of nodes
+//      representation is homogenous (instruction agnostic). control instructions
+//      can be peephole optimized with TODO: (phi functions.)
+
+// NB2: these instructions make up a control subgraph (petri net) where a single
+//      control pointer moves from instruction to instruction as execution
+//      proceeds. this pointer is stored in the scope's first (outermost) nv.
+//      the start instruction replaces the start basic block, and the control
+//      pointer can only proceed to one of {branch, region, stop}. // TODO: enforce this invariant?
 
 use std::{cell::RefCell, rc::{Rc, Weak}};
 use super::{fresh_id, Instr, OpCode, MultiInstr, TypeAndVal};
