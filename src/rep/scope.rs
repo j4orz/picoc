@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::{HashMap, VecDeque}, fmt::Debug, rc::{Rc, 
 use thiserror::Error;
 use crate::rep::ctl::Region;
 
-use super::{Instr, OpCode, TypeAndVal};
+use super::{InstrNode, InstrKind, TypeAndVal};
 // NB1: the program scope is a stack of nvs which are themselves maps from
 //      aliases to usizes which are indices into its inputs. every instruction
 //      node is dead on creation unless aliased by the scope node. once an
@@ -36,21 +36,21 @@ pub enum ScopeError {
     #[error("no environment exists")]
     NoNvExists,
 }
-enum ScopeOp { Read, Update(Rc<dyn Instr>) }
+enum ScopeOp { Read, Update(Rc<dyn InstrNode>) }
 pub const CTRL: &str = "ctl";
 pub const ARG: &str = "arg";
 
 #[derive(Debug, Clone)]
-pub struct Scope { typ: TypeAndVal, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>>, nvs: RefCell<VecDeque<HashMap<String, usize>>> }
+pub struct Scope { typ: TypeAndVal, inputs: RefCell<Vec<Rc<dyn InstrNode>>>, pub outputs: RefCell<Vec<Weak<dyn InstrNode>>>, nvs: RefCell<VecDeque<HashMap<String, usize>>> }
 impl Scope {
     pub fn new() -> Self { Scope { typ: TypeAndVal::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]), nvs: RefCell::new(VecDeque::new()) } }
     pub fn push_nv(self: &Rc<Self>) -> () { self.nvs.borrow_mut().push_back(HashMap::new()); }
     pub fn pop_nv(self: &Rc<Self>) -> () { self.nvs.borrow_mut().pop_back(); }
-    pub fn read(self: &Rc<Self>, alias: String) -> Result<Rc<dyn Instr>, ScopeError> { self.read_update(alias, ScopeOp::Read, self.nvs.borrow().len()-1) } // &mut self for shared foo. lazy phi.
-    pub fn update(self: &Rc<Self>, alias: String, expr: Rc<dyn Instr>) -> Result<Rc<dyn Instr>, ScopeError> { self.read_update(alias, ScopeOp::Update(expr), self.nvs.borrow().len()-1)}
+    pub fn read(self: &Rc<Self>, alias: String) -> Result<Rc<dyn InstrNode>, ScopeError> { self.read_update(alias, ScopeOp::Read, self.nvs.borrow().len()-1) } // &mut self for shared foo. lazy phi.
+    pub fn update(self: &Rc<Self>, alias: String, expr: Rc<dyn InstrNode>) -> Result<Rc<dyn InstrNode>, ScopeError> { self.read_update(alias, ScopeOp::Update(expr), self.nvs.borrow().len()-1)}
 
     // shared read/update makes lazi phi creation easier TODO
-    fn read_update(self: &Rc<Self>, alias: String, op: ScopeOp, level: usize ) -> Result<Rc<dyn Instr>, ScopeError> {
+    fn read_update(self: &Rc<Self>, alias: String, op: ScopeOp, level: usize ) -> Result<Rc<dyn InstrNode>, ScopeError> {
         let nvs = self.nvs.borrow();
         let nv = nvs.get(level).unwrap();
         if let Some(i) = nv.get(&alias) {
@@ -67,7 +67,7 @@ impl Scope {
         }
     }
 
-    pub fn write(self: &Rc<Self>, alias: String, expr: Rc<dyn Instr>) -> Result<(), ScopeError> {
+    pub fn write(self: &Rc<Self>, alias: String, expr: Rc<dyn InstrNode>) -> Result<(), ScopeError> {
         let mut nvs = self.nvs.borrow_mut();
         let cur_nv = nvs.back_mut().ok_or(ScopeError::NoNvExists)?;
         if cur_nv.contains_key(&alias) {
@@ -79,18 +79,18 @@ impl Scope {
         }
     }
 
-    pub fn write_ctrl(self: &Rc<Self>, ctrl: Rc<dyn Instr>) -> () { todo!() }
-    pub fn read_ctrl(self: &Rc<Self>) -> Rc<dyn Instr> { todo!() }
+    pub fn write_ctrl(self: &Rc<Self>, ctrl: Rc<dyn InstrNode>) -> () { todo!() }
+    pub fn read_ctrl(self: &Rc<Self>) -> Rc<dyn InstrNode> { todo!() }
     pub fn merge(&self, other: &Rc<Scope>) -> Rc<Region> {
         // let merge = Region::new();
         todo!()
     }
 }
 
-impl Instr for Scope {
-    fn kind(&self) -> OpCode { OpCode::Scope }
-    fn inputs(&self) -> &RefCell<Vec<Rc<dyn Instr>>> { &self.inputs }
-    fn outputs(&self) -> &RefCell<Vec<Weak<dyn Instr>>> { &self.outputs }
+impl InstrNode for Scope {
+    fn kind(&self) -> InstrKind { InstrKind::Scope }
+    fn uses(&self) -> &RefCell<Vec<Rc<dyn InstrNode>>> { &self.inputs }
+    fn used(&self) -> &RefCell<Vec<Weak<dyn InstrNode>>> { &self.outputs }
     
-    fn idealize(&self) -> Rc<dyn Instr> { todo!() }
+    fn idealize(&self) -> Rc<dyn InstrNode> { todo!() }
 }

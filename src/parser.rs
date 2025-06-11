@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Token, TT},
-    rep::{ctl::{Branch, Return, Start}, data::{Add, Div, Int, Mul, Sub}, scope::{Scope, ScopeError, ARG, CTRL}, Instr, MultiInstr, Proj, TypeAndVal}
+    rep::{ctl::{Branch, Return, Start}, data::{Add, Div, Int, Mul, Sub}, scope::{Scope, ScopeError, ARG, CTRL}, InstrNode, MultiInstr, Proj, TypeAndVal}
 };
 use std::{rc::Rc};
 use thiserror::Error;
@@ -36,7 +36,7 @@ pub enum ParseError {
     }
 }
 
-pub struct Parser { pub start: Rc<dyn Instr>, scope: Rc<Scope> }
+pub struct Parser { pub start: Rc<dyn InstrNode>, scope: Rc<Scope> }
 impl Parser {
     pub fn new(start: Rc<Start>) -> Self {
         Self {
@@ -45,7 +45,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_prg(&mut self, tokens: &[Token]) -> Result<Rc<dyn Instr>, ParseError> {
+    pub fn parse_prg(&mut self, tokens: &[Token]) -> Result<Rc<dyn InstrNode>, ParseError> {
         let r = tokens;
         let (_, r) = require(r, TT::KeywordInt)?;
         let (_, r) = require(r, TT::Alias)?;
@@ -66,7 +66,7 @@ impl Parser {
     }
     
     // NB: lexical scope ==> nv's are only pushed/popped in parse_block
-    fn parse_block<'a>(&mut self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
+    fn parse_block<'a>(&mut self, tokens: &'a [Token]) -> Result<(Rc<dyn InstrNode>, &'a [Token]), ParseError> {
         self.scope.push_nv();
         let (mut output, mut r) = (None, tokens);
         while let Ok((stmt, _r)) = self.parse_stmt(r) {
@@ -77,7 +77,7 @@ impl Parser {
         Ok((output.unwrap(), r))
     }
     
-    fn parse_stmt<'a>(&mut self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
+    fn parse_stmt<'a>(&mut self, tokens: &'a [Token]) -> Result<(Rc<dyn InstrNode>, &'a [Token]), ParseError> {
         match tokens {
             [] => Err(ParseError::Mismatch { expected: "expected: {:?} got an empty token stream".to_string(), actual: "".to_string() }),
             [f, r @ ..] => match f.typ {
@@ -126,11 +126,11 @@ impl Parser {
         }
     }
 
-    fn parse_expr<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
+    fn parse_expr<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn InstrNode>, &'a [Token]), ParseError> {
         self.parse_term(tokens)
     }
     
-    fn parse_term<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
+    fn parse_term<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn InstrNode>, &'a [Token]), ParseError> {
         let (x, r) = self.parse_factor( tokens)?;
     
         match r {
@@ -151,7 +151,7 @@ impl Parser {
         }
     }
     
-    fn parse_factor<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
+    fn parse_factor<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn InstrNode>, &'a [Token]), ParseError> {
         let (x, r) = self.parse_atom( tokens)?;
     
         match r {
@@ -170,7 +170,7 @@ impl Parser {
         }
     }
 
-    fn parse_atom<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn Instr>, &'a [Token]), ParseError> {
+    fn parse_atom<'a>(&self, tokens: &'a [Token]) -> Result<(Rc<dyn InstrNode>, &'a [Token]), ParseError> {
         match tokens {
             [] => Err(ParseError::Mismatch { expected: "expected: {:?} got an empty token stream".to_string(), actual: "".to_string() }),
             [f, r @ ..] => match f.typ {
@@ -210,7 +210,7 @@ mod test_arith {
     use crate::{lexer, rep::{ctl::Start, TypeAndVal}};
     use std::fs;
     
-    const TEST_DIR: &str = "tests/fixtures/snap/shared/arith";
+    const TEST_DIR: &str = "tests/arith";
 
     #[test]
     fn lit() {
@@ -225,25 +225,27 @@ mod test_arith {
         let graph = parser.parse_prg(&tokens).unwrap();
         insta::assert_debug_snapshot!(graph, @r###"
         Return {
-            id: 3,
+            id: 5,
             typ: Bot,
-            inputs: RefCell {
+            uses: RefCell {
                 value: [
                     Start {
                         id: 1,
                         typ: Bot,
-                        inputs: RefCell {
+                        uses: RefCell {
                             value: [],
                         },
-                        outputs: RefCell {
+                        used: RefCell {
                             value: [
+                                (Weak),
+                                (Weak),
                                 (Weak),
                                 (Weak),
                             ],
                         },
                     },
                     Int {
-                        _id: 2,
+                        _id: 4,
                         typ: Int(
                             8,
                         ),
@@ -252,11 +254,13 @@ mod test_arith {
                                 Start {
                                     id: 1,
                                     typ: Bot,
-                                    inputs: RefCell {
+                                    uses: RefCell {
                                         value: [],
                                     },
-                                    outputs: RefCell {
+                                    used: RefCell {
                                         value: [
+                                            (Weak),
+                                            (Weak),
                                             (Weak),
                                             (Weak),
                                         ],
@@ -272,7 +276,7 @@ mod test_arith {
                     },
                 ],
             },
-            outputs: RefCell {
+            used: RefCell {
                 value: [],
             },
         }
