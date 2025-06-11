@@ -14,8 +14,9 @@ use super::{fresh_id, Instr, OpCode, MultiInstr, TypeAndVal};
 #[derive(Debug, Clone)]
 #[rustfmt::skip] pub struct Start { id: i128, typ: TypeAndVal, inputs: RefCell<Vec<Rc<dyn Instr>>>, pub outputs: RefCell<Vec<Weak<dyn Instr>>> }
 impl Start {
-    pub fn new(types: Vec<Box<TypeAndVal>>) -> Rc<Self> {
-        let instr = Rc::new(Self { id: fresh_id(), typ: TypeAndVal::Tup(types), inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]) });
+    pub fn new(_types: Vec<Box<TypeAndVal>>) -> Rc<Self> {
+        //  TypeAndVal::Tup(types)
+        let instr = Rc::new(Self { id: fresh_id(), typ: TypeAndVal::Bot, inputs: RefCell::new(vec![]), outputs: RefCell::new(vec![]) });
         instr
     }
 }

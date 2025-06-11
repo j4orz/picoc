@@ -1,1 +1,20 @@
 picoc: "risc architecture is going to change everything"
+
+analyses
+- dominance
+- loop tree
+- execution freq
+- control dependencies
+- interprocedural call graph
+- defuse
+- alias analysi
+
+optimizations
+- dead code elimination
+- common subexpression elimination (local + global)
+- constant folding
+- arithmetic identities
+- unreachable code elimination
+- code placement
+- operator strength reduction
+- tail recursion elimination

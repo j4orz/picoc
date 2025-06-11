@@ -1,5 +1,4 @@
 use std::{fs, env};
-
 use picoc::{lexer, parser::Parser, rep::{ctl::Start, TypeAndVal}};
 
 fn main() {

@@ -14,6 +14,7 @@ use data::Int;
 ///      everywhere is inevitable with mutable graphs in rust since ownership
 ///      is effectively placing a DAG (tree) on the static type system. if the
 ///      compiler becomes multithreaded then rc's need to be converted to arcs.
+///      TODO: alternatives to rc<refcell<_>>
 
 /// NB2: all instruction constructors that implement the instr trait must call
 ///      .add_children() — this is invariant is enforced by the human reviewer.
@@ -27,12 +28,13 @@ pub fn fresh_id() -> i128 { unsafe { ID += 1; ID } }
 
 // since the generics with trait bounds get monomorphized (static polymorphism),
 // trait objects (dynamic polymorphism) is used because sea of nodes
-// heterogeneity needs dynamic dispatch. since trait objects only provide
+// heterogeneity requires dynamic dispatch. since trait objects only provide
 // polymorphism on behavior and not data, required methods lift individual struct
 // data (which have interior mutability) to shared trait behavior. a single instr
 // enum with variant-specific data would need to do the opposite, and "lower"
 // shared behavior. a heterogenous graph implemented in rust is nasty regardless
-// of how you slice/dice it.
+// of how you slice/dice it given that you're effectively fighting against linear types.
+// TODO: research more into alternatives into heterogenous graphs in rust. petagraph??
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeAndVal { Bot, Top, Simple, Int(i128), Tup(Vec<Box<Self>>) } // see: https://en.wikipedia.org/wiki/Lattice_(order)
