@@ -244,6 +244,8 @@ version = "0.1.0"
 dependencies = [
  "bril-rs",
  "insta",
+ "parking_lot",
+ "rayon",
  "salsa",
  "thiserror",
 ]

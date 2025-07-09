@@ -43,9 +43,3 @@ git -C vendor/bril sparse-checkout add /path/to/new/source
 **RISCV**
 
 **ROCDL**
-
-## Tooling
-picoc local development uses [flowistry](https://cel.cs.brown.edu/paper/modular-information-flow-ownership/)
-which only uses rust toolchains that are supported by [rustc_plugin](https://github.com/cognitive-engineering-lab/rustc_plugin).
-As of now, this means monkey patching cargo's manifest (`cargo-features = ["edition2024"]`) and lockfiles (`version = 3`)
-for this package and all its dependencies

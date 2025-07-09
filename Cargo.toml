@@ -9,6 +9,8 @@ edition = "2024"
 thiserror = "2.0.12"
 bril = { git = "https://github.com/sampsyo/bril", package = "bril-rs" }
 salsa = "0.23.0"
+parking_lot = "0.12.4"
+rayon = "1.10.0"
 
 [dev-dependencies]
 insta = "1.43.1"
